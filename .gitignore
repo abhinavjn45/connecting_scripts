@@ -6,9 +6,9 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Next.js Build Output
-**/nextjs-app/.next/
-**/nextjs-app/out/
-**/nextjs-app/build/
+**/.next/
+**/out/
+**/build/
 
 # Local Environment Variables
 **/.env
