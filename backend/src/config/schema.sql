@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   
   -- Security Audit Logs
   `failed_login_attempts` INT NOT NULL DEFAULT 0,
+  `last_failed_login_at` DATETIME NULL DEFAULT NULL,
   `last_login_at` DATETIME NULL,
   
   -- Timestamps
