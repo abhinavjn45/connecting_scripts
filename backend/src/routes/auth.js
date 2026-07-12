@@ -132,10 +132,11 @@ router.post('/login', loginLimiter, async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
     );
 
+    const isProdOrHttps = process.env.NODE_ENV === 'production' || (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.startsWith('https'));
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: isProdOrHttps,
+      sameSite: isProdOrHttps ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
     });
 
@@ -208,10 +209,11 @@ router.post('/verify-2fa', otpLimiter, async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
     );
 
+    const isProdOrHttps = process.env.NODE_ENV === 'production' || (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.startsWith('https'));
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProdOrHttps,
+      sameSite: isProdOrHttps ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
     });
 
@@ -233,10 +235,11 @@ router.post('/verify-2fa', otpLimiter, async (req, res) => {
 
 // 3. POST /api/auth/logout
 router.post('/logout', (req, res) => {
+  const isProdOrHttps = process.env.NODE_ENV === 'production' || (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.startsWith('https'));
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    secure: isProdOrHttps,
+    sameSite: isProdOrHttps ? 'none' : 'lax'
   });
   return res.json({ success: true, message: 'Logged out successfully.' });
 });
