@@ -166,7 +166,7 @@ function ProfileContent() {
     setPwdMsg("Verifying and changing password...");
 
     try {
-      const res = await fetch("http://localhost:5000/api/profile/change-password", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/change-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -243,7 +243,7 @@ function ProfileContent() {
       const loggedIn = localStorage.getItem("seoc_is_logged_in");
       if (loggedIn !== "true") return;
       try {
-        const res = await fetch("http://localhost:5000/api/profile", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
           credentials: "include"
         });
         const data = await res.json();
@@ -332,7 +332,7 @@ function ProfileContent() {
   // Sync role and permissions matrix to database in real-time
   const syncPermissionsToDb = async (roleName, perms) => {
     try {
-      const res = await fetch("http://localhost:5000/api/profile/rbac", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/rbac`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -415,7 +415,7 @@ function ProfileContent() {
         firstName, lastName, phoneNumber: phone,
         bio, personalEmail, ...changes
       };
-      const res = await fetch("http://localhost:5000/api/profile", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -478,7 +478,7 @@ function ProfileContent() {
     localStorage.setItem("seoc_2fa_enabled", val ? "true" : "false");
     
     try {
-      await fetch("http://localhost:5000/api/profile/tfa", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/tfa`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -498,7 +498,7 @@ function ProfileContent() {
   const handleLogout = async () => {
     setLogoutLoading(true);
     try {
-      await fetch("http://localhost:5000/api/auth/logout", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
         method: "POST",
         credentials: "include"
       });
@@ -591,7 +591,7 @@ function ProfileContent() {
 
           try {
             // Upload to Cloudinary "user_avatars" folder route
-            const res = await fetch("http://localhost:5000/api/assets/upload-avatar", {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/assets/upload-avatar`, {
               method: "POST",
               credentials: "include",
               body: formData
@@ -606,7 +606,7 @@ function ProfileContent() {
             setUploadMsg("Saving settings in database...");
 
             // Save avatar URL in DB
-            const saveRes = await fetch("http://localhost:5000/api/profile/avatar", {
+            const saveRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/avatar`, {
               method: "PUT",
               headers: {
                 "Content-Type": "application/json"

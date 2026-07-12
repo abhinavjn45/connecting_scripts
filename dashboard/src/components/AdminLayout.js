@@ -54,7 +54,7 @@ export default function AdminLayout({ children, title }) {
 
       // Step 2: Verify token with backend — this is the real security gate
       try {
-        const res = await fetch("http://localhost:5000/api/profile", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
           credentials: "include"
         });
 
@@ -292,7 +292,7 @@ export default function AdminLayout({ children, title }) {
                   onClick={async () => {
                     setProfileOpen(false);
                     try {
-                      await fetch("http://localhost:5000/api/auth/logout", {
+                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
                         method: "POST",
                         credentials: "include"
                       });

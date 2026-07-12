@@ -60,7 +60,7 @@ export default function UserManagementPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:5000/api/users", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users`, {
         credentials: "include",
       });
       const data = await res.json();
@@ -133,7 +133,7 @@ export default function UserManagementPage() {
     try {
       if (editingUser) {
         // Update mode
-        const res = await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/${editingUser.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -151,7 +151,7 @@ export default function UserManagementPage() {
         }
       } else {
         // Create mode
-        const res = await fetch("http://localhost:5000/api/users", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -179,7 +179,7 @@ export default function UserManagementPage() {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${deleteTarget.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/${deleteTarget.id}`, {
         method: "DELETE",
         credentials: "include",
       });
