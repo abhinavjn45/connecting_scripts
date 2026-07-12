@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -15,7 +15,17 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const searchParams = useSearchParams();
 
+  // Show contextual message when force-redirected from dashboard
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason === "session_expired") {
+      setInfo("Your session has expired or is no longer valid. Please sign in again.");
+    } else if (reason === "server_unavailable") {
+      setInfo("The server is currently unavailable. Your session was cleared for security. Please try again shortly.");
+    }
+  }, [searchParams]);
   // OTP Ref states for 6 digits
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputRefs = [
@@ -49,6 +59,7 @@ export default function LoginPage() {
       const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
@@ -64,8 +75,6 @@ export default function LoginPage() {
         setError("");
       } else {
         localStorage.setItem("seoc_is_logged_in", "true");
-        localStorage.setItem("seoc_jwt_token", data.token);
-        localStorage.setItem("seoc_rbac_permissions", JSON.stringify(data.permissions || {}));
         localStorage.setItem("seoc_rbac_role", data.user?.role || "Super Admin");
         
         // Dispatch local events to sync sidebar immediately
@@ -108,6 +117,7 @@ export default function LoginPage() {
       const res = await fetch("http://localhost:5000/api/auth/verify-2fa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, otp_code: otpCode })
       });
       const data = await res.json();
@@ -118,8 +128,6 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("seoc_is_logged_in", "true");
-      localStorage.setItem("seoc_jwt_token", data.token);
-      localStorage.setItem("seoc_rbac_permissions", JSON.stringify(data.permissions || {}));
       localStorage.setItem("seoc_rbac_role", data.user?.role || "Super Admin");
       
       window.dispatchEvent(new Event("rbac-update"));
@@ -166,6 +174,12 @@ export default function LoginPage() {
                 <h2>Welcome Back</h2>
                 <p>Sign in with your company email and password</p>
               </div>
+
+              {info && (
+                <div style={{ padding: "12px 14px", backgroundColor: "rgba(245,158,11,0.1)", color: "#b45309", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "8px", fontSize: "13px", marginBottom: "16px", fontWeight: "500", lineHeight: "1.5" }}>
+                  ⚠ {info}
+                </div>
+              )}
 
               {error && (
                 <div style={{ padding: "12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "8px", fontSize: "14px", marginBottom: "20px", fontWeight: "500" }}>

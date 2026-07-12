@@ -38,6 +38,18 @@ async function initializeDatabase() {
         }
         console.log('Database column migrations completed successfully!');
       }
+
+      // Ensure last_failed_login_at column exists (added for H-1 account lockout)
+      const [lockoutCheck] = await db.query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'users' AND column_name = 'last_failed_login_at'
+      `, [process.env.DB_NAME]);
+      if (lockoutCheck.length === 0) {
+        await db.query('ALTER TABLE users ADD COLUMN last_failed_login_at DATETIME NULL DEFAULT NULL AFTER failed_login_attempts');
+        console.log('Migration: added last_failed_login_at column to users table.');
+      }
+
       return;
     }
 

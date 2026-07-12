@@ -60,9 +60,8 @@ export default function UserManagementPage() {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("seoc_jwt_token");
       const res = await fetch("http://localhost:5000/api/users", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -138,8 +137,8 @@ export default function UserManagementPage() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
+          credentials: "include",
           body: JSON.stringify(form),
         });
         const data = await res.json();
@@ -156,8 +155,8 @@ export default function UserManagementPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
+          credentials: "include",
           body: JSON.stringify(form),
         });
         const data = await res.json();
@@ -180,10 +179,9 @@ export default function UserManagementPage() {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
-      const token = localStorage.getItem("seoc_jwt_token");
       const res = await fetch(`http://localhost:5000/api/users/${deleteTarget.id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await res.json();
       if (res.ok && data.success) {

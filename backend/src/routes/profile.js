@@ -147,18 +147,19 @@ router.put('/change-password', verifyToken, async (req, res) => {
 
     const user = users[0];
     // 2. Compare current password hash
-    const isMatch = bcrypt.compareSync(currentPassword, user.password);
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Incorrect current password.' });
     }
 
     // Verify that the new password is not identical to the current password
-    if (currentPassword === newPassword || bcrypt.compareSync(newPassword, user.password)) {
+    const isSame = await bcrypt.compare(newPassword, user.password);
+    if (currentPassword === newPassword || isSame) {
       return res.status(400).json({ success: false, message: 'New password cannot be the same as the current password.' });
     }
 
     // 3. Hash new password and save
-    const hashed = bcrypt.hashSync(newPassword, 10);
+    const hashed = await bcrypt.hash(newPassword, 10);
     await db.query('UPDATE users SET password = ? WHERE id = ?', [hashed, userId]);
 
     return res.json({ success: true, message: 'Password updated successfully in database.' });
@@ -171,18 +172,26 @@ router.put('/change-password', verifyToken, async (req, res) => {
 // 2. PUT /api/profile
 router.put('/', verifyToken, async (req, res) => {
   const userId = req.user.userId;
-  const { firstName, lastName, phoneNumber, bio, companyEmail, personalEmail } = req.body;
+  const { firstName, lastName, phoneNumber, bio, personalEmail } = req.body;
 
-  if (!firstName || !lastName || !companyEmail) {
-    return res.status(400).json({ success: false, message: 'First name, last name, and company email are required.' });
+  if (!firstName || !lastName) {
+    return res.status(400).json({ success: false, message: 'First name and last name are required.' });
+  }
+
+  if (firstName.length > 50 || lastName.length > 50) {
+    return res.status(400).json({ success: false, message: 'Name fields cannot exceed 50 characters.' });
+  }
+
+  if (bio && bio.length > 100) {
+    return res.status(400).json({ success: false, message: 'Bio cannot exceed 100 characters.' });
   }
 
   try {
     await db.query(`
       UPDATE users 
-      SET first_name = ?, last_name = ?, phone_number = ?, bio = ?, company_email = ?, personal_email = ?
+      SET first_name = ?, last_name = ?, phone_number = ?, bio = ?, personal_email = ?
       WHERE id = ?
-    `, [firstName, lastName, phoneNumber, bio, companyEmail, personalEmail || null, userId]);
+    `, [firstName, lastName, phoneNumber, bio, personalEmail || null, userId]);
 
     return res.json({ success: true, message: 'Profile details updated successfully.' });
   } catch (error) {
@@ -208,7 +217,16 @@ router.put('/tfa', verifyToken, async (req, res) => {
 // 4. PUT /api/profile/rbac
 router.put('/rbac', verifyToken, async (req, res) => {
   const userId = req.user.userId;
+  const callerRole = req.user.role;
   const { role, permissions } = req.body;
+
+  if (!['Super Admin', 'Admin'].includes(callerRole)) {
+    return res.status(403).json({ success: false, message: 'Insufficient permissions. Only Admins can update roles and permissions.' });
+  }
+
+  if (role === 'Super Admin' && callerRole !== 'Super Admin') {
+    return res.status(403).json({ success: false, message: 'Only Super Admins can assign the Super Admin role.' });
+  }
 
   if (!role || !permissions) {
     return res.status(400).json({ success: false, message: 'Role and permissions object are required.' });

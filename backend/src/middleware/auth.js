@@ -1,26 +1,33 @@
 const jwt = require('jsonwebtoken');
+const db = require('../config/db');
 
-function verifyToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  
-  if (!authHeader) {
-    return res.status(401).json({
-      success: false,
-      message: 'Access Denied: No session authorization header found.'
-    });
+async function verifyToken(req, res, next) {
+  // Extract token from cookie (primary) or Authorization header (fallback/testing)
+  let token = req.cookies?.token;
+  if (!token) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
   }
-
-  const token = authHeader.split(' ')[1];
+  
   if (!token) {
     return res.status(401).json({
       success: false,
-      message: 'Access Denied: Malformed token header.'
+      message: 'Access Denied: No session token found.'
     });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_jwt_key_please_change_in_production');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
+
+    // Live DB Check: Ensure user is still active (L-1 fix)
+    const [rows] = await db.query('SELECT status FROM users WHERE id = ?', [decoded.userId]);
+    if (!rows[0] || rows[0].status !== 'Active') {
+      return res.status(403).json({ success: false, message: 'Account is not active or has been suspended.' });
+    }
+
     next();
   } catch (error) {
     return res.status(403).json({

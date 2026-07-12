@@ -1,10 +1,18 @@
 const router = require('express').Router();
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const verifyToken = require('../middleware/auth');
 
+function requireAdmin(req, res, next) {
+  if (!['Super Admin', 'Admin'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Insufficient permissions.' });
+  }
+  next();
+}
+
 // GET /api/users - List all users
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requireAdmin, async (req, res) => {
   try {
     const [users] = await db.query(`
       SELECT 
@@ -24,7 +32,7 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // GET /api/users/:id - Get a single user
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const [users] = await db.query(`
@@ -47,7 +55,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // POST /api/users - Create a new user
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requireAdmin, async (req, res) => {
   const {
     firstName, lastName, username, companyEmail, personalEmail,
     phoneNumber, bio, gender, designation, role, status, joiningDate, password
@@ -68,7 +76,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const uniqueId = require('crypto').randomUUID();
+    const uniqueId = crypto.randomUUID();
 
     const [result] = await db.query(`
       INSERT INTO users (
@@ -92,7 +100,7 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // PUT /api/users/:id - Update a user
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const {
     firstName, lastName, username, companyEmail, personalEmail,
@@ -127,7 +135,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 });
 
 // DELETE /api/users/:id - Delete a user (cannot delete self)
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const requestingUserId = req.user.userId;
 

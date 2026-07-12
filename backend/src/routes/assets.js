@@ -8,7 +8,15 @@ const verifyToken = require('../middleware/auth');
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // Limit files to 10MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limit files to 10MB
+  fileFilter: (req, file, cb) => {
+    // Restrict to images only (H-5)
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed.'));
+    }
+  }
 });
 
 // POST /api/assets/upload (Authenticated)

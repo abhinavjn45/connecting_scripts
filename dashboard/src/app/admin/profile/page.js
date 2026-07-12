@@ -112,6 +112,8 @@ function ProfileContent() {
 
   // Change Password Modal States & Visibility Toggle
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -163,14 +165,13 @@ function ProfileContent() {
     setPwdPhase("loading");
     setPwdMsg("Verifying and changing password...");
 
-    const token = localStorage.getItem("seoc_jwt_token");
     try {
       const res = await fetch("http://localhost:5000/api/profile/change-password", {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify({ currentPassword, newPassword })
       });
       const data = await res.json();
@@ -239,11 +240,11 @@ function ProfileContent() {
   // Fetch real profile details and permission matrix from database on mount
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("seoc_jwt_token");
-      if (!token) return;
+      const loggedIn = localStorage.getItem("seoc_is_logged_in");
+      if (loggedIn !== "true") return;
       try {
         const res = await fetch("http://localhost:5000/api/profile", {
-          headers: { "Authorization": `Bearer ${token}` }
+          credentials: "include"
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -330,14 +331,13 @@ function ProfileContent() {
 
   // Sync role and permissions matrix to database in real-time
   const syncPermissionsToDb = async (roleName, perms) => {
-    const token = localStorage.getItem("seoc_jwt_token");
     try {
       const res = await fetch("http://localhost:5000/api/profile/rbac", {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify({ role: roleName, permissions: perms })
       });
       if (res.ok) {
@@ -410,18 +410,17 @@ function ProfileContent() {
     setProfileMsg("Saving profile details to database...");
     setSavingProfile(true);
 
-    const token = localStorage.getItem("seoc_jwt_token");
     try {
       const payload = {
         firstName, lastName, phoneNumber: phone,
-        bio, companyEmail, personalEmail, ...changes
+        bio, personalEmail, ...changes
       };
       const res = await fetch("http://localhost:5000/api/profile", {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -478,14 +477,13 @@ function ProfileContent() {
     setTfaEnabled(val);
     localStorage.setItem("seoc_2fa_enabled", val ? "true" : "false");
     
-    const token = localStorage.getItem("seoc_jwt_token");
     try {
       await fetch("http://localhost:5000/api/profile/tfa", {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify({ twoFactorEnabled: val })
       });
     } catch (err) {
@@ -495,6 +493,21 @@ function ProfileContent() {
 
   const handleRevokeSession = (id) => {
     setSessionList(sessionList.filter((s) => s.id !== id));
+  };
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await fetch("http://localhost:5000/api/auth/logout", {
+        method: "POST",
+        credentials: "include"
+      });
+    } catch (e) {
+      console.error("Logout error", e);
+    }
+    localStorage.removeItem("seoc_jwt_token");
+    localStorage.removeItem("seoc_is_logged_in");
+    window.location.href = "/login";
   };
 
   // 1. File Chooser handler inside the Modal
@@ -572,7 +585,6 @@ function ProfileContent() {
           }
           
           setUploadMsg("Uploading avatar to Cloudinary...");
-          const token = localStorage.getItem("seoc_jwt_token");
 
           const formData = new FormData();
           formData.append("file", blob, "avatar.jpg");
@@ -581,7 +593,7 @@ function ProfileContent() {
             // Upload to Cloudinary "user_avatars" folder route
             const res = await fetch("http://localhost:5000/api/assets/upload-avatar", {
               method: "POST",
-              headers: { "Authorization": `Bearer ${token}` },
+              credentials: "include",
               body: formData
             });
             const data = await res.json();
@@ -597,9 +609,9 @@ function ProfileContent() {
             const saveRes = await fetch("http://localhost:5000/api/profile/avatar", {
               method: "PUT",
               headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
+                "Content-Type": "application/json"
               },
+              credentials: "include",
               body: JSON.stringify({ avatarUrl: data.url })
             });
             const saveData = await saveRes.json();
@@ -649,11 +661,11 @@ function ProfileContent() {
       <div className="card" style={{ 
         display: "flex", 
         flexDirection: "column", 
-        padding: "30px 24px",
+        padding: "20px 24px 0 24px", // Reduced top padding
         position: "sticky",
         top: "102px",
         height: "calc(100vh - 204px)",
-        overflowY: "auto"
+        overflow: "hidden"
       }}>
         {/* Top Section: Avatar left, Details right */}
         <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" }}>
@@ -714,14 +726,23 @@ function ProfileContent() {
         </div>
 
         {/* Bio description */}
-        <p style={{ color: "var(--text-muted)", fontSize: "13px", lineHeight: "1.6", textAlign: "left", margin: "0 0 20px 0" }}>
+        <p style={{ color: "var(--text-muted)", fontSize: "13px", lineHeight: "1.6", textAlign: "left", margin: "0 0 16px 0" }}>
           {(dbProfile && dbProfile.bio) || "No profile bio written yet."}
         </p>
 
-        <hr style={{ border: 0, borderTop: "1px solid var(--border-color)", margin: "0 0 24px 0" }} />
+        <hr style={{ border: 0, borderTop: "1px solid var(--border-color)", margin: "0 0 16px 0", flexShrink: 0 }} />
 
         {/* Details list with larger font size and spacing */}
-        <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: "18px" }}>
+        <div style={{ 
+          textAlign: "left", 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: "18px", 
+          overflowY: "auto", 
+          flex: 1, 
+          paddingRight: "8px", 
+          paddingBottom: "20px" // Reduced bottom padding
+        }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Username</span>
             <strong style={{ color: "var(--text-color)", fontSize: "14px" }}>{username}</strong>
@@ -1132,8 +1153,8 @@ function ProfileContent() {
 
           {/* Tab 2: Security & Access */}
           {activeTab === "security" && (
-            <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "20px", borderBottom: "1px solid var(--border-color)" }}>
+            <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "16px", borderBottom: "1px solid var(--border-color)" }}>
                 <div>
                   <h5 style={{ margin: "0 0 4px 0", fontWeight: "600", fontSize: "14px" }}>Two-Factor Authentication (2FA)</h5>
                   <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)", maxWidth: "500px" }}>Protect your administrative panels from unauthorized password cracking by configuring multi-factor tokens.</p>
@@ -1148,7 +1169,7 @@ function ProfileContent() {
                 </label>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "20px", borderBottom: "1px solid var(--border-color)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "16px", borderBottom: "1px solid var(--border-color)" }}>
                 <div>
                   <h5 style={{ margin: "0 0 4px 0", fontWeight: "600", fontSize: "14px" }}>Account Password</h5>
                   <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)", maxWidth: "500px" }}>Regularly update your password to protect against security audits or leaks.</p>
@@ -1170,6 +1191,31 @@ function ProfileContent() {
                   }}
                 >
                   Change Password
+                </button>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "16px", borderBottom: "1px solid var(--border-color)" }}>
+                <div>
+                  <h5 style={{ margin: "0 0 4px 0", fontWeight: "600", fontSize: "14px" }}>Account Logout</h5>
+                  <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)", maxWidth: "500px" }}>Securely end your current session and clear local authentication data.</p>
+                </div>
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={() => setShowLogoutModal(true)}
+                  style={{ 
+                    padding: "10px 20px", 
+                    fontSize: "13px", 
+                    fontWeight: "600", 
+                    backgroundColor: "var(--danger-color)", 
+                    color: "#ffffff", 
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    transition: "var(--transition)"
+                  }}
+                >
+                  Logout Session
                 </button>
               </div>
 
@@ -1889,6 +1935,52 @@ function ProfileContent() {
                 Dismiss
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",
+          zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "fadeIn 0.2s ease-out"
+        }}>
+          <div className="card" style={{
+            width: "380px", padding: "28px", borderRadius: "16px",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.5)", border: "1px solid var(--border-color)",
+            textAlign: "center"
+          }}>
+            <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger-color)" strokeWidth="2.5">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </div>
+            <h3 style={{ margin: "0 0 8px 0", fontSize: "17px", fontWeight: "700" }}>Logout Session?</h3>
+            <p style={{ margin: "0 0 24px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.6" }}>
+              Are you sure you want to end your current session? You will need to sign in again to access the dashboard.
+            </p>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowLogoutModal(false)} style={{ flex: 1, padding: "12px" }} disabled={logoutLoading}>
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleLogout}
+                disabled={logoutLoading}
+                style={{ 
+                  flex: 1, padding: "12px", fontSize: "14px", fontWeight: "600", 
+                  backgroundColor: "var(--danger-color)", color: "#fff", 
+                  border: "none", borderRadius: "8px", cursor: "pointer", 
+                  transition: "var(--transition)" 
+                }}
+              >
+                {logoutLoading ? "Logging out..." : "Yes, Logout"}
+              </button>
+            </div>
           </div>
         </div>
       )}

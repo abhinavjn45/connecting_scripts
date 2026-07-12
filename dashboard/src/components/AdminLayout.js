@@ -43,46 +43,69 @@ export default function AdminLayout({ children, title }) {
   });
 
   useEffect(() => {
-    // Authenticate user check (Requires active login flag and JWT token)
-    const loggedIn = localStorage.getItem("seoc_is_logged_in");
-    const token = localStorage.getItem("seoc_jwt_token");
-    if (loggedIn !== "true" || !token) {
-      router.push("/login");
-    } else {
-      setCheckingAuth(false);
-    }
-  }, [router]);
+    const verifyAndLoad = async () => {
+      const loggedIn = localStorage.getItem("seoc_is_logged_in");
 
-  useEffect(() => {
-    const loadProfileAndPermissions = async () => {
-      const token = localStorage.getItem("seoc_jwt_token");
-      if (!token) return;
+      // Step 1: Fast local check — if they didn't even pass login screen, redirect
+      if (loggedIn !== "true") {
+        router.replace("/login");
+        return;
+      }
+
+      // Step 2: Verify token with backend — this is the real security gate
       try {
         const res = await fetch("http://localhost:5000/api/profile", {
-          headers: { "Authorization": `Bearer ${token}` }
+          credentials: "include"
         });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          setUser(data.user);
-          setPermissions(data.permissions);
+
+        if (res.status === 401 || res.status === 403) {
+          // Token invalid, expired, or revoked — force logout
+          localStorage.removeItem("seoc_is_logged_in");
+          localStorage.removeItem("seoc_rbac_role");
+          localStorage.removeItem("seoc_rbac_permissions");
+          router.replace("/login?reason=session_expired");
+          return;
         }
-      } catch (e) {
-        console.error("Failed to load profile and permissions from database:", e);
+
+        if (!res.ok) {
+          // Backend is down or returned an unexpected error
+          // Still force logout — do not silently allow dashboard access
+          localStorage.removeItem("seoc_is_logged_in");
+          router.replace("/login?reason=server_unavailable");
+          return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+          setUser(data.user);
+          setPermissions(data.permissions || {});
+
+          // Keep local cache in sync
+          localStorage.setItem("seoc_rbac_role", data.user.role);
+          localStorage.setItem("seoc_rbac_permissions", JSON.stringify(data.permissions));
+        }
+      } catch {
+        // Network error (backend completely unreachable) — force logout
+        localStorage.removeItem("seoc_is_logged_in");
+        router.replace("/login?reason=server_unavailable");
+        return;
       }
+
+      setCheckingAuth(false);
     };
 
-    if (!checkingAuth) {
-      loadProfileAndPermissions();
-    }
+    verifyAndLoad();
 
-    window.addEventListener("rbac-update", loadProfileAndPermissions);
-    window.addEventListener("storage", loadProfileAndPermissions);
+    // Re-verify whenever RBAC or storage changes
+    const handleRbacUpdate = () => verifyAndLoad();
+    window.addEventListener("rbac-update", handleRbacUpdate);
+    window.addEventListener("storage", handleRbacUpdate);
 
     return () => {
-      window.removeEventListener("rbac-update", loadProfileAndPermissions);
-      window.removeEventListener("storage", loadProfileAndPermissions);
+      window.removeEventListener("rbac-update", handleRbacUpdate);
+      window.removeEventListener("storage", handleRbacUpdate);
     };
-  }, [checkingAuth]);
+  }, [router]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -266,10 +289,17 @@ export default function AdminLayout({ children, title }) {
                 </Link>
                 <button 
                   className="dropdown-item logout" 
-                  onClick={() => { 
-                    setProfileOpen(false); 
+                  onClick={async () => {
+                    setProfileOpen(false);
+                    try {
+                      await fetch("http://localhost:5000/api/auth/logout", {
+                        method: "POST",
+                        credentials: "include"
+                      });
+                    } catch (e) {
+                      console.error("Logout API error:", e);
+                    }
                     localStorage.removeItem("seoc_is_logged_in");
-                    localStorage.removeItem("seoc_jwt_token");
                     router.push("/login"); 
                   }}
                 >
