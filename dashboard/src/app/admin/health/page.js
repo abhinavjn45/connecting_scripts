@@ -1,10 +1,9 @@
 "use client";
 
-import AdminLayout from "@/components/AdminLayout";
 
 export default function SiteHealthPage() {
   return (
-    <AdminLayout title="Site Health Diagnostics">
+    <>
       <div className="card" style={{ marginBottom: "24px" }}>
         <h2>Site Health Summary</h2>
         <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
@@ -73,6 +72,6 @@ export default function SiteHealthPage() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </>
   );
 }

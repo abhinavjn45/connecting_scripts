@@ -1,16 +1,13 @@
 "use client";
 
-import AdminLayout from "@/components/AdminLayout";
 
 export default function DatabaseBackupsPage() {
   return (
-    <AdminLayout title="Database Backups">
-      <div className="card">
+    <div className="card">
         <h2>System Backups & Database Dump</h2>
         <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
           Export compressed SQL database archives, schedule weekly automated cloud storage updates, and manage backups.
         </p>
       </div>
-    </AdminLayout>
   );
 }

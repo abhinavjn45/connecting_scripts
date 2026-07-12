@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import AdminLayout from "@/components/AdminLayout";
 
 function ProfileContent() {
   const searchParams = useSearchParams();
@@ -1991,10 +1990,8 @@ function ProfileContent() {
 
 export default function UserProfilePage() {
   return (
-    <AdminLayout title="My Profile">
-      <Suspense fallback={<div className="card">Loading Profile Workspace...</div>}>
+    <Suspense fallback={<div className="card">Loading Profile Workspace...</div>}>
         <ProfileContent />
       </Suspense>
-    </AdminLayout>
   );
 }

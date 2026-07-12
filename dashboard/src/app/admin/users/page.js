@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import AdminLayout from "@/components/AdminLayout";
 
 const ROLES = ["Super Admin", "Admin", "Editor", "Viewer"];
 const GENDERS = ["Male", "Female", "Others"];
@@ -223,7 +222,7 @@ export default function UserManagementPage() {
   };
 
   return (
-    <AdminLayout title="User Management">
+    <>
       {/* Page Header */}
       <div
         style={{
@@ -709,6 +708,6 @@ export default function UserManagementPage() {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       `}</style>
-    </AdminLayout>
+    </>
   );
 }

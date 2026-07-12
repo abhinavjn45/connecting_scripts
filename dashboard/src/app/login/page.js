@@ -15,6 +15,7 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
 
   // Show contextual message when force-redirected from dashboard
@@ -55,6 +56,7 @@ function LoginContent() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/login`, {
         method: "POST",
@@ -83,6 +85,8 @@ function LoginContent() {
       }
     } catch (err) {
       setError("Unable to connect to the backend server. Please verify the server is running on port 5000.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -113,6 +117,7 @@ function LoginContent() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-2fa`, {
         method: "POST",
@@ -134,6 +139,8 @@ function LoginContent() {
       router.push("/");
     } catch (err) {
       setError("Unable to connect to the backend server. Please verify the server is running on port 5000.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -257,8 +264,8 @@ function LoginContent() {
                   </Link>
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px" }}>
-                  Sign In
+                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }} disabled={isLoading}>
+                  {isLoading ? "Signing In..." : "Sign In"}
                 </button>
               </form>
             </>
@@ -312,8 +319,8 @@ function LoginContent() {
                   ))}
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", marginBottom: "16px" }}>
-                  Verify & Log In
+                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", marginBottom: "16px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }} disabled={isLoading}>
+                  {isLoading ? "Verifying..." : "Verify & Log In"}
                 </button>
 
                 <button
