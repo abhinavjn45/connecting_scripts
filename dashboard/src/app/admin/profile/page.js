@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
 
@@ -25,13 +25,82 @@ function ProfileContent() {
     router.replace(`/admin/profile?tab=${tabName}`);
   };
 
-  // Profile Details State
-  const [firstName, setFirstName] = useState("Administrator");
-  const [lastName, setLastName] = useState("User");
-  const [phone, setPhone] = useState("+1 (555) 019-2834");
-  const [email, setEmail] = useState("admin@seocagency.com");
-  const [bio, setBio] = useState("Lead Developer & Super Administrator for SEOC Agency operations dashboard.");
+  // Profile Details State (live form values)
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [companyEmail, setCompanyEmail] = useState("");
+  const [personalEmail, setPersonalEmail] = useState("");
+  const [bio, setBio] = useState("");
+  const [profileImage, setProfileImage] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  // Profile save modal feedback
+  const [profilePhase, setProfilePhase] = useState("idle"); // "idle" | "loading" | "success" | "error"
+  const [profileMsg, setProfileMsg] = useState("");
+  const fileInputRef = useRef(null);
+  const previewImgRef = useRef(null);
+
+  // Snapshot of last-saved DB values — used for left card display, change detection, and reset
+  const [dbProfile, setDbProfile] = useState(null);
+
+  // Left card read-only fields
+  const [username, setUsername] = useState("");
+  const [gender, setGender] = useState("Others");
+  const [designation, setDesignation] = useState("Lead Operator");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [userStatus, setUserStatus] = useState("Active");
+
+  // Copy email feedbacks
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPersonalEmail, setCopiedPersonalEmail] = useState(false);
+
+  const handleCopyEmail = () => {
+    navigator.clipboard.writeText(dbProfile?.companyEmail || companyEmail);
+    setCopiedEmail(true);
+    setTimeout(() => {
+      setCopiedEmail(false);
+    }, 1500);
+  };
+
+  const handleCopyPersonalEmail = () => {
+    navigator.clipboard.writeText(dbProfile?.personalEmail || personalEmail);
+    setCopiedPersonalEmail(true);
+    setTimeout(() => {
+      setCopiedPersonalEmail(false);
+    }, 1500);
+  };
+
+  // Format date helper
+  const formatJoinedDate = (dateStr) => {
+    if (!dateStr) return "June 15, 2026";
+    try {
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return new Date(dateStr).toLocaleDateString('en-US', options);
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Avatar Modal & Crop States
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null); // Base64 Data URL
+  const [zoom, setZoom] = useState(1);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [uploadPhase, setUploadPhase] = useState("idle"); // "idle" | "loading" | "success" | "error"
+  const [uploadMsg, setUploadMsg] = useState("");
+
+  const closeAvatarModal = () => {
+    setShowAvatarModal(false);
+    setSelectedImage(null);
+    setUploadPhase("idle");
+    setUploadMsg("");
+    setZoom(1);
+    setOffsetX(0);
+    setOffsetY(0);
+  };
 
   // Security & 2FA State
   const [tfaEnabled, setTfaEnabled] = useState(false);
@@ -40,6 +109,88 @@ function ProfileContent() {
     { id: 2, device: "Apple iPhone 15 Pro", browser: "Safari Mobile", ip: "172.56.21.90", current: false },
     { id: 3, device: "macOS Macbook Air", browser: "Firefox 125.1", ip: "192.168.1.12", current: false }
   ]);
+
+  // Change Password Modal States & Visibility Toggle
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwdPhase, setPwdPhase] = useState("idle"); // "idle" | "loading" | "success" | "error"
+  const [pwdMsg, setPwdMsg] = useState("");
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPwdPhase("idle");
+    setPwdMsg("");
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPwdPhase("error");
+      setPwdMsg("All fields are required.");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setPwdPhase("error");
+      setPwdMsg("New password cannot be the same as the current password.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdPhase("error");
+      setPwdMsg("New password and confirm password do not match.");
+      return;
+    }
+    
+    // Complexity validation: at least 8 chars, uppercase, lowercase, number, special character
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!strongPasswordRegex.test(newPassword)) {
+      setPwdPhase("error");
+      setPwdMsg("New password must be at least 8 characters long and contain a mix of uppercase, lowercase, numbers, and special characters.");
+      return;
+    }
+
+    setPwdPhase("loading");
+    setPwdMsg("Verifying and changing password...");
+
+    const token = localStorage.getItem("seoc_jwt_token");
+    try {
+      const res = await fetch("http://localhost:5000/api/profile/change-password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPwdPhase("success");
+        setPwdMsg("Password updated successfully!");
+        
+        // Auto close after 1.5 seconds
+        setTimeout(() => {
+          closePasswordModal();
+        }, 1500);
+      } else {
+        setPwdPhase("error");
+        setPwdMsg(data.message || "Failed to update password.");
+      }
+    } catch (err) {
+      setPwdPhase("error");
+      setPwdMsg("Unable to connect to the backend server.");
+    }
+  };
 
   // Notifications preferences State
   const [emailAlerts, setEmailAlerts] = useState({
@@ -51,6 +202,176 @@ function ProfileContent() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
+  // RBAC System Simulator State
+  const [rbacRole, setRbacRole] = useState("Super Admin");
+  
+  // List of all system modules
+  const modulesList = [
+    { key: 'services', name: 'Services', category: 'Content Management' },
+    { key: 'case_studies', name: 'Case Study', category: 'Content Management' },
+    { key: 'products', name: 'Products', category: 'Content Management' },
+    { key: 'blogs', name: 'Blogs', category: 'Content Management' },
+    { key: 'seo', name: 'SEO Management', category: 'Content Management' },
+    { key: 'websites', name: 'Websites', category: 'CRM' },
+    { key: 'clients', name: 'Clients', category: 'CRM' },
+    { key: 'design_demos', name: 'Design Demos', category: 'CRM' },
+    { key: 'invoices', name: 'Invoices', category: 'Accounting' },
+    { key: 'expenses', name: 'Expenses', category: 'Accounting' },
+    { key: 'reports', name: 'Reports', category: 'Accounting' },
+    { key: 'contact_queries', name: 'Contact Queries', category: 'Leads Management' },
+    { key: 'leads_extractor', name: 'Leads Extractor', category: 'Leads Management' },
+    { key: 'other_queries', name: 'Other Queries', category: 'Leads Management' },
+    { key: 'users', name: 'User Management', category: 'Administration' },
+    { key: 'passwords', name: 'Password Manager', category: 'Administration' },
+    { key: 'backups', name: 'Database Backups', category: 'Administration' },
+    { key: 'site_health', name: 'Site Health', category: 'Administration' },
+    { key: 'settings', name: 'Settings', category: 'Administration' }
+  ];
+
+  const [rbacPermissions, setRbacPermissions] = useState(() => {
+    const initial = {};
+    modulesList.forEach(m => {
+      initial[m.key] = { read: true, create: true, update: true, delete: true };
+    });
+    return initial;
+  });
+
+  // Fetch real profile details and permission matrix from database on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem("seoc_jwt_token");
+      if (!token) return;
+      try {
+        const res = await fetch("http://localhost:5000/api/profile", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const snap = {
+            firstName: data.user.firstName || "",
+            lastName: data.user.lastName || "",
+            phone: data.user.phoneNumber || "",
+            companyEmail: data.user.companyEmail || "",
+            personalEmail: data.user.personalEmail || "",
+            bio: data.user.bio || "",
+          };
+
+          // Set form fields
+          setFirstName(snap.firstName);
+          setLastName(snap.lastName);
+          setPhone(snap.phone);
+          setCompanyEmail(snap.companyEmail);
+          setPersonalEmail(snap.personalEmail);
+          setBio(snap.bio);
+
+          // Save DB snapshot for left card display, change-detection, and reset
+          setDbProfile(snap);
+
+          setTfaEnabled(data.user.twoFactorEnabled || false);
+          setRbacRole(data.user.role || "Super Admin");
+          setRbacPermissions(data.permissions || {});
+          setProfileImage(data.user.profileImage || "");
+
+          setUsername(data.user.username || "");
+          setGender(data.user.gender || "Others");
+          setDesignation(data.user.designation || "Lead Operator");
+          setJoiningDate(data.user.joiningDate || "");
+          setUserStatus(data.user.status || "Active");
+
+          // Sync locally for sidebars
+          localStorage.setItem("seoc_rbac_role", data.user.role);
+          localStorage.setItem("seoc_rbac_permissions", JSON.stringify(data.permissions));
+          localStorage.setItem("seoc_2fa_enabled", data.user.twoFactorEnabled ? "true" : "false");
+          window.dispatchEvent(new Event("rbac-update"));
+        }
+      } catch (err) {
+        console.error("Failed to load profile from backend database:", err);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  // Generate presets helper
+  const getPresetPermissions = (roleName) => {
+    const perms = {};
+    modulesList.forEach(m => {
+      if (roleName === "Super Admin") {
+        perms[m.key] = { read: true, create: true, update: true, delete: true };
+      } else if (roleName === "Content Editor") {
+        const isContent = m.category === 'Content Management';
+        perms[m.key] = { 
+          read: isContent, 
+          create: isContent, 
+          update: isContent, 
+          delete: isContent 
+        };
+      } else if (roleName === "CRM Agent") {
+        const isCrm = m.category === 'CRM' || m.category === 'Leads Management';
+        perms[m.key] = { 
+          read: isCrm, 
+          create: isCrm, 
+          update: isCrm, 
+          delete: isCrm 
+        };
+      } else if (roleName === "Accountant") {
+        const isFinance = m.category === 'Accounting';
+        perms[m.key] = { 
+          read: isFinance, 
+          create: isFinance, 
+          update: isFinance, 
+          delete: isFinance 
+        };
+      } else {
+        perms[m.key] = { read: true, create: false, update: false, delete: false };
+      }
+    });
+    return perms;
+  };
+
+  // Sync role and permissions matrix to database in real-time
+  const syncPermissionsToDb = async (roleName, perms) => {
+    const token = localStorage.getItem("seoc_jwt_token");
+    try {
+      const res = await fetch("http://localhost:5000/api/profile/rbac", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ role: roleName, permissions: perms })
+      });
+      if (res.ok) {
+        localStorage.setItem("seoc_rbac_role", roleName);
+        localStorage.setItem("seoc_rbac_permissions", JSON.stringify(perms));
+        window.dispatchEvent(new Event("rbac-update"));
+      }
+    } catch (err) {
+      console.error("Failed to sync permissions to database:", err);
+    }
+  };
+
+  const handleRoleChange = async (roleName) => {
+    setRbacRole(roleName);
+    const newPerms = getPresetPermissions(roleName);
+    setRbacPermissions(newPerms);
+    await syncPermissionsToDb(roleName, newPerms);
+    setSuccessMsg(`Switched role to ${roleName}! SQL database matrix updated.`);
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const handlePermissionToggle = async (moduleKey, action) => {
+    const updatedPerms = {
+      ...rbacPermissions,
+      [moduleKey]: {
+        ...rbacPermissions[moduleKey],
+        [action]: !rbacPermissions[moduleKey][action]
+      }
+    };
+    setRbacPermissions(updatedPerms);
+    setRbacRole("Custom Privileges");
+    await syncPermissionsToDb("Custom Privileges", updatedPerms);
+  };
+
   const recentActivities = [
     { id: 1, action: "Updated SEO keywords metadata", target: "SEO Management", time: "10 mins ago" },
     { id: 2, action: "Extracted 42 fresh business leads", target: "Leads Extractor", time: "1 hour ago" },
@@ -59,21 +380,93 @@ function ProfileContent() {
     { id: 5, action: "Generated new website portfolio preview", target: "CRM - Design Demos", time: "2 days ago" }
   ];
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
+
+    // Detect which editable fields have changed vs last saved DB snapshot
+    const changes = {};
+    if (dbProfile) {
+      if (firstName !== dbProfile.firstName) changes.firstName = firstName;
+      if (lastName !== dbProfile.lastName) changes.lastName = lastName;
+      if (phone !== dbProfile.phone) changes.phoneNumber = phone;
+      if (bio !== dbProfile.bio) changes.bio = bio;
+      if (personalEmail !== dbProfile.personalEmail) changes.personalEmail = personalEmail;
+    } else {
+      changes.firstName = firstName;
+      changes.lastName = lastName;
+      changes.phoneNumber = phone;
+      changes.bio = bio;
+      changes.personalEmail = personalEmail;
+      changes.companyEmail = companyEmail;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      setProfilePhase("error");
+      setProfileMsg("No changes detected — nothing to save.");
+      return;
+    }
+
+    setProfilePhase("loading");
+    setProfileMsg("Saving profile details to database...");
     setSavingProfile(true);
-    setSuccessMsg("");
-    setTimeout(() => {
+
+    const token = localStorage.getItem("seoc_jwt_token");
+    try {
+      const payload = {
+        firstName, lastName, phoneNumber: phone,
+        bio, companyEmail, personalEmail, ...changes
+      };
+      const res = await fetch("http://localhost:5000/api/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDbProfile({ firstName, lastName, phone, companyEmail, personalEmail, bio });
+        setProfilePhase("success");
+        setProfileMsg("Profile details saved successfully!");
+        setTimeout(() => setProfilePhase("idle"), 1800);
+      } else {
+        setProfilePhase("error");
+        setProfileMsg(data.message || "Failed to save profile.");
+      }
+    } catch (err) {
+      setProfilePhase("error");
+      setProfileMsg("Unable to connect to the backend server.");
+    } finally {
       setSavingProfile(false);
-      setSuccessMsg("Profile information saved successfully!");
-      setTimeout(() => setSuccessMsg(""), 3000);
-    }, 1000);
+    }
   };
 
-  const handleSaveSettings = (e) => {
+  // Reset form back to the last saved DB values
+  const handleResetForm = () => {
+    if (!dbProfile) return;
+    setFirstName(dbProfile.firstName);
+    setLastName(dbProfile.lastName);
+    setPhone(dbProfile.phone);
+    setPersonalEmail(dbProfile.personalEmail);
+    setBio(dbProfile.bio);
+    setSuccessMsg("");
+  };
+
+  // True when any editable form field differs from the saved DB snapshot
+  const hasUnsavedChanges = dbProfile && (
+    firstName !== dbProfile.firstName ||
+    lastName !== dbProfile.lastName ||
+    phone !== dbProfile.phone ||
+    bio !== dbProfile.bio ||
+    personalEmail !== dbProfile.personalEmail
+  );
+
+  const handleSaveSettings = async (e) => {
     e.preventDefault();
     setSavingSettings(true);
     setSuccessMsg("");
+    
     setTimeout(() => {
       setSavingSettings(false);
       setSuccessMsg("Account preferences updated successfully!");
@@ -81,13 +474,173 @@ function ProfileContent() {
     }, 1000);
   };
 
+  const handleTfaToggle = async (val) => {
+    setTfaEnabled(val);
+    localStorage.setItem("seoc_2fa_enabled", val ? "true" : "false");
+    
+    const token = localStorage.getItem("seoc_jwt_token");
+    try {
+      await fetch("http://localhost:5000/api/profile/tfa", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ twoFactorEnabled: val })
+      });
+    } catch (err) {
+      console.error("Failed to sync 2FA status to database:", err);
+    }
+  };
+
   const handleRevokeSession = (id) => {
     setSessionList(sessionList.filter((s) => s.id !== id));
   };
 
-  const handleAvatarChange = () => {
-    alert("Simulating file upload. In production, this opens a file explorer dialog to upload an image.");
+  // 1. File Chooser handler inside the Modal
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedImage(reader.result);
+      setZoom(1);
+      setOffsetX(0);
+      setOffsetY(0);
+    };
+    reader.readAsDataURL(file);
   };
+
+  // 2. Reposition Drag-to-Pan event listeners
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - offsetX, y: e.clientY - offsetY });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    setOffsetX(e.clientX - dragStart.x);
+    setOffsetY(e.clientY - dragStart.y);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // 3. HTML5 Canvas Square-Cropping and Dedicated User Avatar Cloudinary Upload
+  const handleAvatarCropAndUpload = async () => {
+    if (!selectedImage || !previewImgRef.current) return;
+    
+    setUploadPhase("loading");
+    setUploadMsg("Cropping and formatting image to square aspect ratio...");
+    
+    const imgElement = previewImgRef.current;
+    const renderedWidth = imgElement.offsetWidth;
+    const renderedHeight = imgElement.offsetHeight;
+
+    const img = new Image();
+    img.src = selectedImage;
+    img.onload = async () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 300;
+        canvas.height = 300;
+        const ctx = canvas.getContext("2d");
+
+        // Scale factor from crop box size (260px) to destination canvas size (300px)
+        const canvasScale = 300 / 260;
+        
+        const targetWidth = renderedWidth * zoom * canvasScale;
+        const targetHeight = renderedHeight * zoom * canvasScale;
+        
+        const dx = (150 + offsetX * canvasScale) - (targetWidth / 2);
+        const dy = (150 + offsetY * canvasScale) - (targetHeight / 2);
+
+        // Fill background white
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.drawImage(img, dx, dy, targetWidth, targetHeight);
+
+        // Extract binary image BLOB
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            setUploadPhase("error");
+            setUploadMsg("Failed to generate cropped image matrix.");
+            return;
+          }
+          
+          setUploadMsg("Uploading avatar to Cloudinary...");
+          const token = localStorage.getItem("seoc_jwt_token");
+
+          const formData = new FormData();
+          formData.append("file", blob, "avatar.jpg");
+
+          try {
+            // Upload to Cloudinary "user_avatars" folder route
+            const res = await fetch("http://localhost:5000/api/assets/upload-avatar", {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${token}` },
+              body: formData
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              setUploadPhase("error");
+              setUploadMsg(data.message || "Failed to upload to Cloudinary.");
+              return;
+            }
+
+            setUploadMsg("Saving settings in database...");
+
+            // Save avatar URL in DB
+            const saveRes = await fetch("http://localhost:5000/api/profile/avatar", {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ avatarUrl: data.url })
+            });
+            const saveData = await saveRes.json();
+            if (saveRes.ok && saveData.success) {
+              setProfileImage(data.url);
+              setUploadPhase("success");
+              setUploadMsg("Avatar updated successfully!");
+              
+              // Tell AdminLayout to sync top header avatar
+              window.dispatchEvent(new Event("rbac-update"));
+              
+              // Close popup after 1.5 seconds automatically
+              setTimeout(() => {
+                closeAvatarModal();
+              }, 1500);
+            } else {
+              setUploadPhase("error");
+              setUploadMsg(saveData.message || "Failed to update profile image.");
+            }
+          } catch (err) {
+            setUploadPhase("error");
+            setUploadMsg("Failed to connect to upload server.");
+          }
+        }, "image/jpeg", 0.95);
+        
+      } catch (err) {
+        setUploadPhase("error");
+        setUploadMsg("Error executing image crop canvas draw.");
+      }
+    };
+  };
+
+  // Count active modules access (read-enabled)
+  const activeReadCount = Object.values(rbacPermissions).filter(p => p.read).length;
+
+  // Real-time password complexity evaluation helpers
+  const pwdMinLength = newPassword.length >= 8;
+  const pwdUppercase = /[A-Z]/.test(newPassword);
+  const pwdLowercase = /[a-z]/.test(newPassword);
+  const pwdNumber = /\d/.test(newPassword);
+  const pwdSpecial = /[^A-Za-z0-9]/.test(newPassword);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "24px", alignItems: "start" }}>
@@ -96,68 +649,193 @@ function ProfileContent() {
       <div className="card" style={{ 
         display: "flex", 
         flexDirection: "column", 
-        alignItems: "center", 
-        textAlign: "center", 
         padding: "30px 24px",
         position: "sticky",
         top: "102px",
         height: "calc(100vh - 204px)",
         overflowY: "auto"
       }}>
-        <div style={{ position: "relative", width: "110px", height: "110px", borderRadius: "50%", backgroundColor: "var(--primary-light)", color: "var(--primary-color)", fontSize: "36px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "20px", border: "3px solid var(--border-color)" }}>
-          A
-          <button 
-            onClick={handleAvatarChange}
-            style={{
-              position: "absolute",
-              bottom: "0",
-              right: "0",
-              backgroundColor: "var(--primary-color)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "50%",
-              width: "32px",
-              height: "32px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-              transition: "var(--transition)"
-            }}
-            title="Change Avatar"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
-            </svg>
-          </button>
+        {/* Top Section: Avatar left, Details right */}
+        <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" }}>
+          {/* Avatar Container */}
+          <div style={{ position: "relative", width: "80px", height: "80px", borderRadius: "50%", backgroundColor: "var(--primary-light)", color: "var(--primary-color)", fontSize: "28px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid var(--border-color)", flexShrink: 0 }}>
+            {profileImage ? (
+              <img 
+                src={profileImage} 
+                alt="Avatar Summary" 
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} 
+            />
+            ) : (
+              <span>{dbProfile?.firstName ? dbProfile.firstName[0].toUpperCase() : 'A'}</span>
+            )}
+            <button 
+              type="button"
+              onClick={() => setShowAvatarModal(true)}
+              style={{
+                position: "absolute",
+                bottom: "-4px",
+                right: "-4px",
+                backgroundColor: "var(--primary-color)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "50%",
+                width: "28px",
+                height: "28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                transition: "var(--transition)",
+                zIndex: 10
+              }}
+              title="Change Avatar"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </button>
+          </div>
+
+          {/* User Name & Role Info */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", overflow: "hidden", textAlign: "left" }}>
+            <h3 style={{ fontSize: "18px", fontWeight: "700", margin: 0, color: "var(--text-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {dbProfile ? `${dbProfile.firstName} ${dbProfile.lastName}` : "—"}
+            </h3>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span style={{ color: "var(--text-muted)", fontSize: "13px", fontWeight: "500" }}>{rbacRole}</span>
+              {/* Gender Badge next to Role */}
+              <span className="badge primary" style={{ padding: "3px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "600", textTransform: "capitalize" }}>
+                {gender}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "4px", color: "var(--text-color)" }}>
-          {firstName} {lastName}
-        </h3>
-        <p style={{ color: "var(--text-muted)", fontSize: "13px", marginBottom: "16px" }}>Super Admin</p>
-        <span className="badge success" style={{ padding: "5px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>Active Status</span>
+        {/* Bio description */}
+        <p style={{ color: "var(--text-muted)", fontSize: "13px", lineHeight: "1.6", textAlign: "left", margin: "0 0 20px 0" }}>
+          {(dbProfile && dbProfile.bio) || "No profile bio written yet."}
+        </p>
 
-        <div style={{ borderTop: "1px solid var(--border-color)", width: "100%", marginTop: "24px", paddingTop: "20px", textAlign: "left", fontSize: "13px", display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "var(--text-muted)" }}>Designation</span>
-            <strong style={{ color: "var(--text-color)" }}>Lead Operator</strong>
+        <hr style={{ border: 0, borderTop: "1px solid var(--border-color)", margin: "0 0 24px 0" }} />
+
+        {/* Details list with larger font size and spacing */}
+        <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: "18px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Username</span>
+            <strong style={{ color: "var(--text-color)", fontSize: "14px" }}>{username}</strong>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "var(--text-muted)" }}>Joined On</span>
-            <strong style={{ color: "var(--text-color)" }}>June 15, 2026</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Company Email</span>
+            <button
+              type="button"
+              onClick={handleCopyEmail}
+              style={{
+                background: copiedEmail ? "var(--success-light)" : "var(--primary-light)",
+                border: "1px solid var(--border-color)",
+                color: copiedEmail ? "var(--success-color)" : "var(--primary-color)",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: "600",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "var(--transition)",
+                outline: "none"
+              }}
+            >
+              {copiedEmail ? (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  Copy Email
+                </>
+              )}
+            </button>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "var(--text-muted)" }}>2FA Auth</span>
-            <strong style={{ color: tfaEnabled ? "var(--success-color)" : "var(--danger-color)" }}>
-              {tfaEnabled ? "Enabled" : "Disabled"}
-            </strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Personal Email</span>
+            {dbProfile?.personalEmail ? (
+              <button
+                type="button"
+                onClick={handleCopyPersonalEmail}
+                style={{
+                  background: copiedPersonalEmail ? "var(--success-light)" : "var(--primary-light)",
+                  border: "1px solid var(--border-color)",
+                  color: copiedPersonalEmail ? "var(--success-color)" : "var(--primary-color)",
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  transition: "var(--transition)",
+                  outline: "none"
+                }}
+              >
+                {copiedPersonalEmail ? (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    Copy Email
+                  </>
+                )}
+              </button>
+            ) : (
+              <span style={{ color: "var(--text-muted)", fontSize: "13px", fontStyle: "italic" }}>Not set</span>
+            )}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "var(--text-muted)" }}>Active Sessions</span>
-            <strong style={{ color: "var(--text-color)" }}>{sessionList.length} Sessions</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Phone</span>
+            <a 
+              href={`tel:${dbProfile?.phone || ""}`} 
+              style={{ 
+                color: "var(--primary-color)", 
+                fontSize: "14px", 
+                fontWeight: "600", 
+                textDecoration: "none" 
+              }}
+              className="hover-underline"
+            >
+              {dbProfile?.phone || "—"}
+            </a>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Designation</span>
+            <strong style={{ color: "var(--text-color)", fontSize: "14px" }}>{designation}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Joined On</span>
+            <strong style={{ color: "var(--text-color)", fontSize: "14px" }}>{formatJoinedDate(joiningDate)}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "500" }}>Status</span>
+            <span className={`badge ${userStatus.toLowerCase() === 'active' ? 'success' : 'primary'}`} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "600" }}>
+              {userStatus}
+            </span>
           </div>
         </div>
       </div>
@@ -172,7 +850,7 @@ function ProfileContent() {
         flexDirection: "column"
       }}>
         
-        {/* Tab Headers (Sticky layout) */}
+        {/* Tab Headers */}
         <div style={{ display: "flex", gap: "24px", borderBottom: "1px solid var(--border-color)", marginBottom: "28px", flexShrink: 0, overflowX: "auto", whiteSpace: "nowrap", paddingBottom: "2px" }}>
           <button 
             type="button"
@@ -247,11 +925,7 @@ function ProfileContent() {
         {/* Scrollable Content wrapper */}
         <div style={{ flex: 1, overflowY: "auto", paddingRight: "8px" }}>
           
-          {successMsg && (
-            <div style={{ padding: "12px", backgroundColor: "var(--success-light)", color: "var(--success-color)", borderRadius: "8px", fontSize: "14px", marginBottom: "20px", fontWeight: "600" }}>
-              {successMsg}
-            </div>
-          )}
+
 
           {/* Tab 1: Personal Details Content */}
           {activeTab === "details" && (
@@ -291,33 +965,167 @@ function ProfileContent() {
                   />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Email Address</label>
+                  <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    Username
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "400", fontStyle: "italic" }}>(Cannot be changed)</span>
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={username} 
+                      readOnly
+                      tabIndex={-1}
+                      style={{ 
+                        paddingRight: "40px",
+                        backgroundColor: "var(--bg-color)",
+                        color: "var(--text-muted)",
+                        cursor: "not-allowed",
+                        userSelect: "none"
+                      }} 
+                    />
+                    <span style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--text-muted)",
+                      display: "flex",
+                      alignItems: "center",
+                      pointerEvents: "none"
+                    }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    Company Email
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "400", fontStyle: "italic" }}>(Cannot be changed)</span>
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <input 
+                      type="email" 
+                      className="form-input" 
+                      value={companyEmail}
+                      readOnly
+                      tabIndex={-1}
+                      style={{
+                        paddingRight: "40px",
+                        backgroundColor: "var(--bg-color)",
+                        color: "var(--text-muted)",
+                        cursor: "not-allowed",
+                        userSelect: "none"
+                      }}
+                    />
+                    <span style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--text-muted)",
+                      display: "flex",
+                      alignItems: "center",
+                      pointerEvents: "none"
+                    }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Personal Email</label>
                   <input 
                     type="email" 
                     className="form-input" 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
-                    required 
+                    value={personalEmail} 
+                    onChange={(e) => setPersonalEmail(e.target.value)} 
+                    placeholder="e.g. name@personal.com"
                   />
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Personal Bio</label>
+                <label className="form-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Personal Bio</span>
+                  <span style={{
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    color: bio.length >= 100 ? "var(--danger-color)" : bio.length >= 80 ? "#f59e0b" : "var(--text-muted)",
+                    transition: "color 0.2s"
+                  }}>
+                    {bio.length} / 100
+                  </span>
+                </label>
                 <textarea 
                   className="form-input" 
                   rows="3" 
                   value={bio} 
-                  onChange={(e) => setBio(e.target.value)} 
-                  style={{ resize: "none", minHeight: "90px", fontFamily: "inherit" }}
+                  onChange={(e) => { if (e.target.value.length <= 100) setBio(e.target.value); }}
+                  maxLength={100}
+                  style={{ 
+                    resize: "none", 
+                    minHeight: "90px", 
+                    fontFamily: "inherit",
+                    borderColor: bio.length >= 100 ? "var(--danger-color)" : bio.length >= 80 ? "#f59e0b" : undefined,
+                    transition: "border-color 0.2s"
+                  }}
                   required
                 />
               </div>
 
-              <div style={{ marginTop: "10px" }}>
-                <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px" }} disabled={savingProfile}>
-                  {savingProfile ? "Saving Changes..." : "Save Changes"}
+
+              <div style={{ marginTop: "10px", display: "flex", gap: "12px", alignItems: "center" }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ padding: "12px 24px", display: "flex", alignItems: "center", gap: "8px", opacity: (!hasUnsavedChanges && dbProfile) ? 0.5 : 1 }}
+                  disabled={savingProfile || (!hasUnsavedChanges && !!dbProfile)}
+                >
+                  {savingProfile ? (
+                    <>
+                      <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </button>
+
+                {hasUnsavedChanges && (
+                  <button
+                    type="button"
+                    onClick={handleResetForm}
+                    style={{
+                      padding: "12px 20px",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      background: "none",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "8px",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      transition: "var(--transition)"
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="1 4 1 10 7 10" />
+                      <path d="M3.51 15a9 9 0 1 0 .49-3.68" />
+                    </svg>
+                    Reset
+                  </button>
+                )}
               </div>
             </form>
           )}
@@ -330,13 +1138,39 @@ function ProfileContent() {
                   <h5 style={{ margin: "0 0 4px 0", fontWeight: "600", fontSize: "14px" }}>Two-Factor Authentication (2FA)</h5>
                   <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)", maxWidth: "500px" }}>Protect your administrative panels from unauthorized password cracking by configuring multi-factor tokens.</p>
                 </div>
-                <label className="remember-me" style={{ gap: 0 }}>
+                <label className="switch-container">
                   <input 
                     type="checkbox" 
                     checked={tfaEnabled} 
-                    onChange={(e) => setTfaEnabled(e.target.checked)} 
+                    onChange={(e) => handleTfaToggle(e.target.checked)} 
                   />
+                  <span className="switch-slider"></span>
                 </label>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "20px", borderBottom: "1px solid var(--border-color)" }}>
+                <div>
+                  <h5 style={{ margin: "0 0 4px 0", fontWeight: "600", fontSize: "14px" }}>Account Password</h5>
+                  <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)", maxWidth: "500px" }}>Regularly update your password to protect against security audits or leaks.</p>
+                </div>
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={() => setShowPasswordModal(true)}
+                  style={{ 
+                    padding: "10px 20px", 
+                    fontSize: "13px", 
+                    fontWeight: "600", 
+                    backgroundColor: "var(--danger-color)", 
+                    color: "#ffffff", 
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    transition: "var(--transition)"
+                  }}
+                >
+                  Change Password
+                </button>
               </div>
 
               <div>
@@ -441,7 +1275,7 @@ function ProfileContent() {
             </form>
           )}
 
-          {/* Tab 4: Activity History */}
+          {/* Tab 5: Activity History */}
           {activeTab === "activity" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {recentActivities.map((act) => (
@@ -459,6 +1293,606 @@ function ProfileContent() {
         </div>
 
       </div>
+
+      {/* 4. Interactive Profile Image Crop Modal overlay */}
+      {showAvatarModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(8, 17, 32, 0.8)",
+          backdropFilter: "blur(4px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: "fadeIn 0.25s ease-out"
+        }}>
+          <div className="card" style={{
+            width: "360px",
+            padding: "24px",
+            backgroundColor: "var(--surface-color)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "16px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            minHeight: "260px",
+            justifyContent: "center"
+          }}>
+            {uploadPhase !== "idle" ? (
+              // Phase C: Upload Status Animations (Loading, Success Tick, or Error Cross)
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 0", textAlign: "center", width: "100%" }}>
+                {uploadPhase === "loading" && (
+                  <div className="spinner-loader" style={{ width: "60px", height: "60px", border: "4px solid rgba(77, 68, 197, 0.15)", borderTop: "4px solid var(--primary-color)", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "20px" }}></div>
+                )}
+                
+                {uploadPhase === "success" && (
+                  <svg className="animated-tick" width="70" height="70" viewBox="0 0 52 52" style={{ borderRadius: "50%", display: "block", strokeWidth: "3", stroke: "var(--success-color)", strokeMiterlimit: "10", boxShadow: "inset 0px 0px 0px var(--success-color)", animation: "scaleTick .3s ease-in-out both", marginBottom: "20px" }}>
+                    <circle className="tick-circle" cx="26" cy="26" r="25" fill="none" style={{ strokeDasharray: "166", strokeDashoffset: "166", strokeWidth: "3", strokeMiterlimit: "10", stroke: "var(--success-color)", fill: "none", animation: "strokeCircle .6s cubic-bezier(0.65, 0, 0.45, 1) forwards" }} />
+                    <path className="tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" style={{ transformOrigin: "50% 50%", strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--success-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65, 0, 0.45, 1) .6s forwards" }} />
+                  </svg>
+                )}
+
+                {uploadPhase === "error" && (
+                  <svg className="animated-cross" width="70" height="70" viewBox="0 0 52 52" style={{ borderRadius: "50%", display: "block", strokeWidth: "3", stroke: "var(--danger-color)", strokeMiterlimit: "10", animation: "scaleTick .3s ease-in-out both", marginBottom: "20px" }}>
+                    <circle className="tick-circle" cx="26" cy="26" r="25" fill="none" style={{ strokeDasharray: "166", strokeDashoffset: "166", strokeWidth: "3", strokeMiterlimit: "10", stroke: "var(--danger-color)", fill: "none", animation: "strokeCircle .6s cubic-bezier(0.65, 0, 0.45, 1) forwards" }} />
+                    <path className="tick-check" fill="none" d="M16 16l20 20" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--danger-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65, 0, 0.45, 1) .4s forwards" }} />
+                    <path className="tick-check" fill="none" d="M36 16l-20 20" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--danger-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65, 0, 0.45, 1) .6s forwards" }} />
+                  </svg>
+                )}
+
+                <p style={{ margin: "0 0 24px 0", fontSize: "14px", fontWeight: "600", color: "var(--text-color)", lineHeight: "1.5" }}>{uploadMsg}</p>
+
+                {uploadPhase === "error" && (
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      setUploadPhase("idle");
+                      setUploadMsg("");
+                    }}
+                    style={{ padding: "10px 24px", fontSize: "12px", minWidth: "140px" }}
+                  >
+                    Go Back & Retry
+                  </button>
+                )}
+              </div>
+            ) : (
+              // Phase A & B: Setup Workspace
+              <>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "700", width: "100%", textAlign: "center" }}>
+                  Update Profile Photo
+                </h3>
+
+                {/* Hidden native file input element */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  style={{ display: "none" }} 
+                  accept="image/*" 
+                />
+
+                {!selectedImage ? (
+                  // Phase A: Existing avatar display
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "24px", width: "100%" }}>
+                    <div style={{ width: "160px", height: "160px", borderRadius: "50%", overflow: "hidden", border: "4px solid var(--border-color)", backgroundColor: "var(--bg-color)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {profileImage ? (
+                        <img 
+                          src={profileImage} 
+                          alt="Current Avatar" 
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                        />
+                      ) : (
+                        <span style={{ fontSize: "56px", fontWeight: "800", color: "var(--primary-color)" }}>
+                          {firstName ? firstName[0].toUpperCase() : 'A'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: "12px", width: "100%" }}>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={closeAvatarModal}
+                        style={{ flex: 1, padding: "12px" }}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                        style={{ flex: 1, padding: "12px" }}
+                      >
+                        Edit Avatar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // Phase B: Image crop workspace with circular cutout mask
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+                    <div 
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={handleMouseUp}
+                      style={{
+                        position: "relative",
+                        width: "260px",
+                        height: "260px",
+                        backgroundColor: "#000",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                        cursor: isDragging ? "grabbing" : "grab",
+                        border: "1px solid var(--border-color)",
+                        boxShadow: "inset 0 4px 12px rgba(0,0,0,0.5)"
+                      }}
+                    >
+                      {/* Panned and Zoomed Image */}
+                      <img 
+                        ref={previewImgRef}
+                        src={selectedImage} 
+                        alt="Source Crop"
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) scale(${zoom})`,
+                          transition: isDragging ? "none" : "transform 0.1s ease-out",
+                          userSelect: "none",
+                          pointerEvents: "none",
+                          maxWidth: "none",
+                          maxHeight: "none",
+                          width: "auto",
+                          height: "100%"
+                        }}
+                      />
+                      
+                      {/* Circular Cutout Frame Overlay */}
+                      <div style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        borderRadius: "50%",
+                        boxShadow: "0 0 0 9999px rgba(8, 17, 32, 0.75)",
+                        pointerEvents: "none",
+                        border: "2px dashed var(--primary-color)"
+                      }}></div>
+                    </div>
+
+                    {/* Zoom range controller */}
+                    <div style={{ width: "100%", margin: "20px 0 16px 0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "500" }}>
+                        <span>Zoom Level</span>
+                        <strong style={{ color: "var(--primary-color)", fontSize: "13px" }}>{Math.round(zoom * 100)}%</strong>
+                      </div>
+                      <input 
+                        type="range" 
+                        className="premium-range"
+                        min="1.0" 
+                        max="3.0" 
+                        step="0.05"
+                        value={zoom}
+                        onChange={(e) => setZoom(parseFloat(e.target.value))}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setZoom(1);
+                          setOffsetX(0);
+                          setOffsetY(0);
+                        }}
+                        style={{ flex: 1, padding: "10px", fontSize: "12px" }}
+                      >
+                        Back
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={handleAvatarCropAndUpload}
+                        style={{ flex: 2, padding: "10px", fontSize: "12px" }}
+                      >
+                        Update Profile Image
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          
+          <style jsx global>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes strokeCircle {
+              100% { stroke-dashoffset: 0; }
+            }
+            @keyframes strokeCheck {
+              100% { stroke-dashoffset: 0; }
+            }
+            @keyframes scaleTick {
+              0%, 100% { transform: none; }
+              50% { transform: scale3d(1.1, 1.1, 1); }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* 5. Change Password Modal overlay */}
+      {showPasswordModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(8, 17, 32, 0.8)",
+          backdropFilter: "blur(4px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: "fadeIn 0.25s ease-out"
+        }}>
+          <div className="card" style={{
+            width: "360px",
+            padding: "24px",
+            backgroundColor: "var(--surface-color)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "16px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            minHeight: "260px",
+            justifyContent: "center"
+          }}>
+            {pwdPhase !== "idle" ? (
+              // Status Phase: Loading, Success Tick, or Error Cross
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 0", textAlign: "center", width: "100%" }}>
+                {pwdPhase === "loading" && (
+                  <div className="spinner-loader" style={{ width: "60px", height: "60px", border: "4px solid rgba(77, 68, 197, 0.15)", borderTop: "4px solid var(--primary-color)", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "20px" }}></div>
+                )}
+                
+                {pwdPhase === "success" && (
+                  <svg className="animated-tick" width="70" height="70" viewBox="0 0 52 52" style={{ borderRadius: "50%", display: "block", strokeWidth: "3", stroke: "var(--success-color)", strokeMiterlimit: "10", boxShadow: "inset 0px 0px 0px var(--success-color)", animation: "scaleTick .3s ease-in-out both", marginBottom: "20px" }}>
+                    <circle className="tick-circle" cx="26" cy="26" r="25" fill="none" style={{ strokeDasharray: "166", strokeDashoffset: "166", strokeWidth: "3", strokeMiterlimit: "10", stroke: "var(--success-color)", fill: "none", animation: "strokeCircle .6s cubic-bezier(0.65, 0, 0.45, 1) forwards" }} />
+                    <path className="tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" style={{ transformOrigin: "50% 50%", strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--success-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65, 0, 0.45, 1) .6s forwards" }} />
+                  </svg>
+                )}
+
+                {pwdPhase === "error" && (
+                  <svg className="animated-cross" width="70" height="70" viewBox="0 0 52 52" style={{ borderRadius: "50%", display: "block", strokeWidth: "3", stroke: "var(--danger-color)", strokeMiterlimit: "10", animation: "scaleTick .3s ease-in-out both", marginBottom: "20px" }}>
+                    <circle className="tick-circle" cx="26" cy="26" r="25" fill="none" style={{ strokeDasharray: "166", strokeDashoffset: "166", strokeWidth: "3", strokeMiterlimit: "10", stroke: "var(--danger-color)", fill: "none", animation: "strokeCircle .6s cubic-bezier(0.65, 0, 0.45, 1) forwards" }} />
+                    <path className="tick-check" fill="none" d="M16 16l20 20" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--danger-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65, 0, 0.45, 1) .4s forwards" }} />
+                    <path className="tick-check" fill="none" d="M36 16l-20 20" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--danger-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65, 0, 0.45, 1) .6s forwards" }} />
+                  </svg>
+                )}
+
+                <p style={{ margin: "0 0 24px 0", fontSize: "14px", fontWeight: "600", color: "var(--text-color)", lineHeight: "1.5" }}>{pwdMsg}</p>
+
+                {pwdPhase === "error" && (
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      setPwdPhase("idle");
+                      setPwdMsg("");
+                    }}
+                    style={{ padding: "10px 24px", fontSize: "12px", minWidth: "140px" }}
+                  >
+                    Go Back & Retry
+                  </button>
+                )}
+              </div>
+            ) : (
+              // Form Input Phase
+              <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+                <h3 style={{ margin: "0 0 4px 0", fontSize: "16px", fontWeight: "700", textAlign: "center" }}>
+                  Change Account Password
+                </h3>
+                <p style={{ margin: "0 0 10px 0", fontSize: "12px", color: "var(--text-muted)", textAlign: "center" }}>
+                  Please enter your credentials to complete updates.
+                </p>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: "12px" }}>Current Password</label>
+                  <div style={{ position: "relative" }}>
+                    <input 
+                      type={showCurrentPassword ? "text" : "password"} 
+                      className="form-input" 
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required 
+                      style={{ padding: "10px 40px 10px 14px", fontSize: "13px", width: "100%" }}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      style={{
+                        position: "absolute",
+                        right: "12px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0
+                      }}
+                    >
+                      {showCurrentPassword ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: "12px" }}>New Password</label>
+                  <div style={{ position: "relative" }}>
+                    <input 
+                      type={showNewPassword ? "text" : "password"} 
+                      className="form-input" 
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required 
+                      style={{ padding: "10px 40px 10px 14px", fontSize: "13px", width: "100%" }}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      style={{
+                        position: "absolute",
+                        right: "12px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0
+                      }}
+                    >
+                      {showNewPassword ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {/* Real-time Password Strength Criteria List */}
+                  {newPassword && (
+                    <div style={{ 
+                      fontSize: "11px", 
+                      marginTop: "6px", 
+                      color: "var(--text-muted)", 
+                      display: "flex", 
+                      flexDirection: "column", 
+                      gap: "4px",
+                      backgroundColor: "rgba(77, 68, 197, 0.05)",
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border-color)"
+                    }}>
+                      <span style={{ fontWeight: "600", color: "var(--text-color)", marginBottom: "2px" }}>Password Requirements:</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: pwdMinLength ? "var(--success-color)" : "var(--text-muted)", fontWeight: pwdMinLength ? "600" : "400" }}>
+                        <span>{pwdMinLength ? "✓" : "•"}</span> At least 8 characters
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: (pwdUppercase && pwdLowercase) ? "var(--success-color)" : "var(--text-muted)", fontWeight: (pwdUppercase && pwdLowercase) ? "600" : "400" }}>
+                        <span>{(pwdUppercase && pwdLowercase) ? "✓" : "•"}</span> Uppercase & lowercase letters
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: pwdNumber ? "var(--success-color)" : "var(--text-muted)", fontWeight: pwdNumber ? "600" : "400" }}>
+                        <span>{pwdNumber ? "✓" : "•"}</span> At least one number (0-9)
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: pwdSpecial ? "var(--success-color)" : "var(--text-muted)", fontWeight: pwdSpecial ? "600" : "400" }}>
+                        <span>{pwdSpecial ? "✓" : "•"}</span> At least one special character
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: "12px" }}>Confirm New Password</label>
+                  <div style={{ position: "relative" }}>
+                    <input 
+                      type={showConfirmPassword ? "text" : "password"} 
+                      className="form-input" 
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required 
+                      style={{ padding: "10px 40px 10px 14px", fontSize: "13px", width: "100%" }}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={{
+                        position: "absolute",
+                        right: "12px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0
+                      }}
+                    >
+                      {showConfirmPassword ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {/* Real-time Match Check Indicator */}
+                  {confirmPassword && (
+                    <div style={{ 
+                      fontSize: "11px", 
+                      marginTop: "5px", 
+                      color: confirmPassword === newPassword ? "var(--success-color)" : "var(--danger-color)",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}>
+                      {confirmPassword === newPassword ? (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          Passwords match
+                        </>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                          Passwords do not match
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", marginTop: "10px", width: "100%" }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={closePasswordModal}
+                    style={{ flex: 1, padding: "12px", fontSize: "13px" }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn" 
+                    style={{ 
+                      flex: 1, 
+                      padding: "12px", 
+                      fontSize: "13px", 
+                      fontWeight: "600", 
+                      backgroundColor: "var(--danger-color)", 
+                      color: "#ffffff", 
+                      border: "none", 
+                      borderRadius: "6px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Change Password
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Profile Save Feedback Modal */}
+      {profilePhase !== "idle" && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",
+          zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "fadeIn 0.25s ease-out"
+        }}>
+          <div className="card" style={{
+            width: "340px", padding: "36px 28px",
+            backgroundColor: "var(--surface-color)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "16px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", textAlign: "center"
+          }}>
+            {profilePhase === "loading" && (
+              <div style={{ width: "60px", height: "60px", border: "4px solid rgba(77,68,197,0.15)", borderTop: "4px solid var(--primary-color)", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "20px" }} />
+            )}
+
+            {profilePhase === "success" && (
+              <svg width="70" height="70" viewBox="0 0 52 52" style={{ display: "block", animation: "scaleTick .3s ease-in-out both", marginBottom: "20px" }}>
+                <circle cx="26" cy="26" r="25" fill="none" style={{ strokeDasharray: "166", strokeDashoffset: "166", strokeWidth: "3", strokeMiterlimit: "10", stroke: "var(--success-color)", animation: "strokeCircle .6s cubic-bezier(0.65,0,0.45,1) forwards" }} />
+                <path fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--success-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65,0,0.45,1) .6s forwards" }} />
+              </svg>
+            )}
+
+            {profilePhase === "error" && (
+              <svg width="70" height="70" viewBox="0 0 52 52" style={{ display: "block", animation: "scaleTick .3s ease-in-out both", marginBottom: "20px" }}>
+                <circle cx="26" cy="26" r="25" fill="none" style={{ strokeDasharray: "166", strokeDashoffset: "166", strokeWidth: "3", strokeMiterlimit: "10", stroke: "var(--danger-color)", animation: "strokeCircle .6s cubic-bezier(0.65,0,0.45,1) forwards" }} />
+                <path fill="none" d="M16 16l20 20" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--danger-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65,0,0.45,1) .4s forwards" }} />
+                <path fill="none" d="M36 16l-20 20" style={{ strokeDasharray: "48", strokeDashoffset: "48", stroke: "var(--danger-color)", strokeWidth: "3", animation: "strokeCheck .3s cubic-bezier(0.65,0,0.45,1) .6s forwards" }} />
+              </svg>
+            )}
+
+            <p style={{ margin: "0 0 24px 0", fontSize: "14px", fontWeight: "600", color: "var(--text-color)", lineHeight: "1.5" }}>
+              {profileMsg}
+            </p>
+
+            {profilePhase === "error" && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => { setProfilePhase("idle"); setProfileMsg(""); }}
+                style={{ padding: "10px 28px", fontSize: "13px" }}
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

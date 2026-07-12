@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Sidebar from "./Sidebar";
 import { useTheme } from "./ThemeProvider";
@@ -13,6 +13,76 @@ export default function AdminLayout({ children, title }) {
   const { theme, toggleTheme } = useTheme();
   const profileRef = useRef(null);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Authentication State
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Logged in user info state
+  const [user, setUser] = useState({
+    firstName: "Administrator",
+    lastName: "User",
+    email: "admin@seocagency.com",
+    role: "Super Admin"
+  });
+
+  // RBAC permissions state representing the CRUD matrix
+  const [permissions, setPermissions] = useState(() => {
+    const defaultPerms = {};
+    const modules = [
+      'services', 'case_studies', 'products', 'blogs', 'seo',
+      'websites', 'clients', 'design_demos',
+      'invoices', 'expenses', 'reports',
+      'contact_queries', 'leads_extractor', 'other_queries',
+      'users', 'passwords', 'backups', 'site_health', 'settings'
+    ];
+    modules.forEach(m => {
+      defaultPerms[m] = { read: true, create: true, update: true, delete: true };
+    });
+    return defaultPerms;
+  });
+
+  useEffect(() => {
+    // Authenticate user check (Requires active login flag and JWT token)
+    const loggedIn = localStorage.getItem("seoc_is_logged_in");
+    const token = localStorage.getItem("seoc_jwt_token");
+    if (loggedIn !== "true" || !token) {
+      router.push("/login");
+    } else {
+      setCheckingAuth(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const loadProfileAndPermissions = async () => {
+      const token = localStorage.getItem("seoc_jwt_token");
+      if (!token) return;
+      try {
+        const res = await fetch("http://localhost:5000/api/profile", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setUser(data.user);
+          setPermissions(data.permissions);
+        }
+      } catch (e) {
+        console.error("Failed to load profile and permissions from database:", e);
+      }
+    };
+
+    if (!checkingAuth) {
+      loadProfileAndPermissions();
+    }
+
+    window.addEventListener("rbac-update", loadProfileAndPermissions);
+    window.addEventListener("storage", loadProfileAndPermissions);
+
+    return () => {
+      window.removeEventListener("rbac-update", loadProfileAndPermissions);
+      window.removeEventListener("storage", loadProfileAndPermissions);
+    };
+  }, [checkingAuth]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -35,13 +105,69 @@ export default function AdminLayout({ children, title }) {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  const toggleProfile = () => {
-    setProfileOpen(!profileOpen);
+  // Check path authorization by checking CRUD read permission
+  const checkHasPermission = () => {
+    if (pathname === "/") return true;
+    if (pathname.startsWith("/admin/profile")) return true; // Profile settings are always viewable
+
+    if (pathname.startsWith("/services")) return permissions.services?.read;
+    if (pathname.startsWith("/case-studies")) return permissions.case_studies?.read;
+    if (pathname.startsWith("/products")) return permissions.products?.read;
+    if (pathname.startsWith("/blogs")) return permissions.blogs?.read;
+    if (pathname.startsWith("/seo")) return permissions.seo?.read;
+
+    if (pathname.startsWith("/crm/websites")) return permissions.websites?.read;
+    if (pathname.startsWith("/crm/clients")) return permissions.clients?.read;
+    if (pathname.startsWith("/crm/design-demos")) return permissions.design_demos?.read;
+
+    if (pathname.startsWith("/accounting/invoices")) return permissions.invoices?.read;
+    if (pathname.startsWith("/accounting/expenses")) return permissions.expenses?.read;
+    if (pathname.startsWith("/accounting/reports")) return permissions.reports?.read;
+
+    if (pathname.startsWith("/leads/contact-queries")) return permissions.contact_queries?.read;
+    if (pathname.startsWith("/leads/extractor")) return permissions.leads_extractor?.read;
+    if (pathname.startsWith("/leads/other-queries")) return permissions.other_queries?.read;
+
+    if (pathname.startsWith("/admin/users")) return permissions.users?.read;
+    if (pathname.startsWith("/admin/password")) return permissions.passwords?.read;
+    if (pathname.startsWith("/admin/backups")) return permissions.backups?.read;
+    if (pathname.startsWith("/admin/health")) return permissions.site_health?.read;
+    if (pathname.startsWith("/settings")) return permissions.settings?.read;
+
+    return true;
   };
+
+  const isAuthorized = checkHasPermission();
+
+  // If redirecting, render a premium placeholder loading view to prevent layout shifts/content flashing
+  if (checkingAuth) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "#081120", color: "#ffffff" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ 
+            width: "48px", 
+            height: "48px", 
+            border: "3px solid #1b254b", 
+            borderTopColor: "#4d44c5", 
+            borderRadius: "50%", 
+            animation: "spin 1s infinite linear", 
+            margin: "0 auto 16px auto" 
+          }}></div>
+          <span style={{ fontSize: "14px", fontWeight: "600", color: "#9ca3af" }}>Securing workspace connection...</span>
+          <style jsx global>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`admin-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-      <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} permissions={permissions} />
       <div className="main-wrapper">
         <header className="top-bar">
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -75,7 +201,7 @@ export default function AdminLayout({ children, title }) {
           </div>
 
           <div className="top-bar-actions">
-            {/* Theme Toggle Button (Only Sun and Moon Icons) */}
+            {/* Theme Toggle Button */}
             <button className="header-theme-toggle" onClick={toggleTheme} aria-label="Toggle Theme">
               {theme === "dark" ? (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -96,13 +222,22 @@ export default function AdminLayout({ children, title }) {
               )}
             </button>
 
-            {/* User Profile Dropdown Area */}
+            {/* Profile Dropdown Component */}
             <div className="user-profile-wrapper" ref={profileRef}>
-              <button className="user-profile-trigger" onClick={toggleProfile}>
-                <div className="user-avatar">A</div>
+              <button className="user-profile-trigger" onClick={() => setProfileOpen(!profileOpen)}>
+                {user.profileImage ? (
+                  <img 
+                    src={user.profileImage} 
+                    alt="Avatar" 
+                    className="user-avatar"
+                    style={{ objectFit: "cover" }}
+                  />
+                ) : (
+                  <div className="user-avatar">{user.firstName ? user.firstName[0].toUpperCase() : 'A'}</div>
+                )}
                 <div className="user-info-text">
-                  <span className="fullname">Administrator</span>
-                  <span className="role">Super Admin</span>
+                  <span className="fullname">{user.firstName} {user.lastName}</span>
+                  <span className="role">{user.role}</span>
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="6 9 12 15 18 9" />
@@ -112,8 +247,8 @@ export default function AdminLayout({ children, title }) {
               {/* Interactive Profile Dropdown Menu */}
               <div className={`profile-dropdown ${profileOpen ? "show" : ""}`}>
                 <div className="dropdown-user-header">
-                  <h4>Administrator</h4>
-                  <p>admin@seocagency.com</p>
+                  <h4>{user.firstName} {user.lastName}</h4>
+                  <p>{user.email}</p>
                 </div>
                 <Link href="/admin/profile" className="dropdown-item" onClick={() => setProfileOpen(false)} style={{ textDecoration: "none" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -129,7 +264,15 @@ export default function AdminLayout({ children, title }) {
                   </svg>
                   <span>Account Settings</span>
                 </Link>
-                <button className="dropdown-item logout" onClick={() => { setProfileOpen(false); router.push("/login"); }}>
+                <button 
+                  className="dropdown-item logout" 
+                  onClick={() => { 
+                    setProfileOpen(false); 
+                    localStorage.removeItem("seoc_is_logged_in");
+                    localStorage.removeItem("seoc_jwt_token");
+                    router.push("/login"); 
+                  }}
+                >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                     <polyline points="16 17 21 12 16 7" />
@@ -143,16 +286,32 @@ export default function AdminLayout({ children, title }) {
         </header>
 
         <main className="content-body">
-          {children}
+          {isAuthorized ? children : (
+            <div className="card" style={{ maxWidth: "500px", margin: "80px auto", textAlign: "center", padding: "40px 32px" }}>
+              <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px auto" }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h2 style={{ fontSize: "24px", fontWeight: "800", marginBottom: "12px", color: "var(--text-color)" }}>Access Denied</h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "14px", lineHeight: "1.6", marginBottom: "28px" }}>
+                You do not have the required permissions to access this section of the SEOC Administration Workspace. Please contact your system administrator to request access.
+              </p>
+              <Link href="/" className="btn btn-primary" style={{ textDecoration: "none", display: "inline-flex" }}>
+                Return to Dashboard
+              </Link>
+            </div>
+          )}
         </main>
 
-        {/* Layout Footer (Copyright Left, Credits Right) */}
+        {/* Layout Footer */}
         <footer className="admin-footer">
           <div>
             <span>© 2026 <strong>SEOC</strong>. All Rights Reserved.</span>
           </div>
           <div>
-            <span>Crafted by <a href="https://connectingscripts.com" target="_blank" rel="noopener noreferrer">Connecting Scripts</a></span>
+            <span>Developed by <strong>Connecting Scripts</strong></span>
           </div>
         </footer>
       </div>

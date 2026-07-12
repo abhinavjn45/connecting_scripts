@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
 
+const initializeDatabase = require('./config/initDb');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -18,6 +20,22 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Initialize database schema tables on server boot
+initializeDatabase().then(() => {
+  console.log('Database verification phase completed.');
+});
+
+// Route Handlers
+const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile');
+const assetRoutes = require('./routes/assets');
+const usersRoutes = require('./routes/users');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/users', usersRoutes);
+
 // Health Check Endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date() });
@@ -25,7 +43,7 @@ app.get('/health', (req, res) => {
 
 // Root Route
 app.get('/', (req, res) => {
-  res.send('SEOC Backend API is running successfully.');
+  res.send('SEOC Backend API is running successfully with MySQL connection.');
 });
 
 // Global Error Handler

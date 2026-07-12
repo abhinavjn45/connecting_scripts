@@ -1,7 +1,7 @@
 "use client";
 
 import AdminLayout from "../../components/AdminLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function BlogsPage() {
   const [blogs, setBlogs] = useState([
@@ -12,9 +12,44 @@ export default function BlogsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newAuthor, setNewAuthor] = useState("Ben Stokes");
-  
+
+  // Local CRUD Permission status for the Blogs Module
+  const [crudPermissions, setCrudPermissions] = useState({
+    read: true,
+    create: true,
+    update: true,
+    delete: true
+  });
+
+  useEffect(() => {
+    const loadPermissions = () => {
+      const stored = localStorage.getItem("seoc_rbac_permissions");
+      if (stored) {
+        try {
+          const perms = JSON.parse(stored);
+          if (perms.blogs) {
+            setCrudPermissions(perms.blogs);
+          }
+        } catch (e) {}
+      }
+    };
+    loadPermissions();
+    window.addEventListener("rbac-update", loadPermissions);
+    return () => window.removeEventListener("rbac-update", loadPermissions);
+  }, []);
+
+  const triggerActionCheck = (actionType) => {
+    // actionType: 'create' | 'update' | 'delete'
+    if (!crudPermissions[actionType]) {
+      alert(`Access Denied: You do not have permission to ${actionType.toUpperCase()} entries in the Blogs module.`);
+      return false;
+    }
+    return true;
+  };
+
   const handleAddBlog = (e) => {
     e.preventDefault();
+    if (!triggerActionCheck("create")) return;
     if (!newTitle) return;
     const newBlog = {
       id: Date.now(),
@@ -28,7 +63,13 @@ export default function BlogsPage() {
     setIsModalOpen(false);
   };
 
+  const handleEditBlog = (title) => {
+    if (!triggerActionCheck("update")) return;
+    alert(`Editing simulated: "${title}"`);
+  };
+
   const handleDelete = (id) => {
+    if (!triggerActionCheck("delete")) return;
     setBlogs(blogs.filter(b => b.id !== id));
   };
 
@@ -36,7 +77,17 @@ export default function BlogsPage() {
     <AdminLayout title="Manage Blogs">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <h2 style={{ fontSize: "16px", color: "var(--text-muted)" }}>{blogs.length} articles found</h2>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+        
+        {/* Disable button visually if create permission is disabled */}
+        <button 
+          className="btn btn-primary" 
+          onClick={() => {
+            if (triggerActionCheck("create")) {
+              setIsModalOpen(true);
+            }
+          }}
+          style={{ opacity: crudPermissions.create ? 1 : 0.6 }}
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
@@ -65,8 +116,20 @@ export default function BlogsPage() {
                   <td>{blog.date}</td>
                   <td>{blog.views}</td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="btn btn-secondary" style={{ padding: "6px 12px", fontSize: "12px", marginRight: "8px" }}>Edit</button>
-                    <button className="btn btn-secondary" style={{ padding: "6px 12px", fontSize: "12px", color: "var(--danger-color)" }} onClick={() => handleDelete(blog.id)}>Delete</button>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ padding: "6px 12px", fontSize: "12px", marginRight: "8px", opacity: crudPermissions.update ? 1 : 0.6 }}
+                      onClick={() => handleEditBlog(blog.title)}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ padding: "6px 12px", fontSize: "12px", color: "var(--danger-color)", opacity: crudPermissions.delete ? 1 : 0.6 }} 
+                      onClick={() => handleDelete(blog.id)}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -98,7 +161,7 @@ export default function BlogsPage() {
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Publish</button>
+                <button type="submit" className="btn btn-primary">Publish Post</button>
               </div>
             </form>
           </div>
