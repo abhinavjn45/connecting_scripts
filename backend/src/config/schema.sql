@@ -101,8 +101,8 @@ INSERT INTO `users` (
   `unique_id`, `first_name`, `last_name`, `username`, `company_email`, `personal_email`, `password`, 
   `phone_number`, `bio`, `gender`, `joining_date`, `designation`, `role`, `status`
 ) VALUES (
-  'a2a5ef52-613d-11ed-ad41-0242ac120002', 'Administrator', 'User', 'admin', 'admin@seocagency.com', 'admin.personal@seocagency.com', 
-  '$2b$10$95XvIqfI37oP3jQvKvhOEuVwQ1k.L2mO12u8T416XhB.YFpA.P1kG', '+15550192834', 
+  'a2a5ef52-613d-11ed-ad41-0242ac120002', 'Abhinav', 'Jain', 'abhinav_jn_45', 'abhinav@connectingscripts.co.in', NULL, 
+  '$2a$10$CMinQqjcskt4.qNRUiLTquhclc39y3QJn.BsQgICAvgnNeRIEKJRS', '+15550192834', 
   'Super Administrator for agency operations dashboard.', 'Others', '2026-06-15', 
   'Lead Operator', 'Super Admin', 'Active'
 );
