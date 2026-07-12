@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   
   // Step: "credentials" | "2fa_otp"
@@ -335,5 +335,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "var(--bg-color)" }}><div style={{ width: "40px", height: "40px", border: "3px solid rgba(77,68,197,0.2)", borderTop: "3px solid var(--primary-color)", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
