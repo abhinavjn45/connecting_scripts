@@ -16,7 +16,19 @@ function LoginContent() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [resendAttempts, setResendAttempts] = useState(0);
   const searchParams = useSearchParams();
+
+  // Handle Resend Timer
+  useEffect(() => {
+    let timer;
+    if (resendTimer > 0) {
+      timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendTimer]);
 
   // Show contextual message when force-redirected from dashboard
   useEffect(() => {
@@ -73,7 +85,7 @@ function LoginContent() {
 
       if (data.requires2fa) {
         setLoginStep("2fa_otp");
-        setInfo("Multi-factor authentication required. Check your backend console for the OTP code.");
+        setInfo("An OTP has been sent to your registered email.");
         setError("");
       } else {
         localStorage.setItem("cs_is_logged_in", "true");
@@ -141,6 +153,35 @@ function LoginContent() {
       setError("Unable to connect to the backend server. Please verify the server is running on port 5000.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsResending(true);
+    setError("");
+    setInfo("Resending OTP...");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/resend-2fa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        setInfo(data.message || "OTP sent successfully.");
+        const nextAttempts = resendAttempts + 1;
+        setResendAttempts(nextAttempts);
+        if (nextAttempts === 1) setResendTimer(30);
+        else if (nextAttempts === 2) setResendTimer(60);
+        else setResendTimer(120);
+      } else {
+        setError(data.message || "Failed to resend OTP.");
+      }
+    } catch (err) {
+      setError("Unable to connect to server.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -328,10 +369,29 @@ function LoginContent() {
                   {isLoading ? (
                     <>
                       <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
-                      Verifying...
+                      Verifying OTP...
                     </>
                   ) : "Verify & Log In"}
                 </button>
+
+                <div style={{ textAlign: "center", marginBottom: "16px" }}>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isResending || resendTimer > 0}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: (isResending || resendTimer > 0) ? "var(--text-muted)" : "var(--primary-color)",
+                      fontWeight: "600",
+                      fontSize: "14px",
+                      cursor: (isResending || resendTimer > 0) ? "not-allowed" : "pointer",
+                      textDecoration: (isResending || resendTimer > 0) ? "none" : "underline"
+                    }}
+                  >
+                    {isResending ? "Resending OTP..." : resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : "Didn't receive code? Resend OTP"}
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -340,6 +400,9 @@ function LoginContent() {
                     setLoginStep("credentials");
                     setError("");
                     setInfo("");
+                    setOtp(["", "", "", "", "", ""]);
+                    setResendTimer(0);
+                    setResendAttempts(0);
                   }}
                   style={{ width: "100%", padding: "14px" }}
                 >

@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
+const { send2FAEmail } = require('../services/emailService');
 
 // --- Rate Limiters ---
 
@@ -115,8 +116,11 @@ router.post('/login', loginLimiter, async (req, res) => {
       const hashedOtp = await bcrypt.hash(otpCode, 8);
       await db.query('UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', [hashedOtp, otpExpires, user.id]);
 
-
-
+      // Dispatch the email asynchronously so the UI updates instantly
+      const targetEmail = user.personal_email || user.company_email;
+      send2FAEmail(targetEmail, user.first_name, otpCode).catch(err => {
+        console.error("Login 2FA Email failed:", err);
+      });
       return res.json({
         success: true,
         requires2fa: true,
@@ -230,6 +234,42 @@ router.post('/verify-2fa', otpLimiter, async (req, res) => {
   } catch (error) {
     console.error('2FA verification error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error occurred.' });
+  }
+});
+
+// 2.5 POST /api/auth/resend-2fa
+router.post('/resend-2fa', otpLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT * FROM users WHERE company_email = ?', [email]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = users[0];
+    if (user.two_factor_enabled !== 1) {
+      return res.status(400).json({ success: false, message: '2FA is not enabled for this account.' });
+    }
+
+    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); 
+
+    const hashedOtp = await bcrypt.hash(otpCode, 8);
+    await db.query('UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', [hashedOtp, otpExpires, user.id]);
+
+    const targetEmail = user.personal_email || user.company_email;
+    send2FAEmail(targetEmail, user.first_name, otpCode).catch(err => {
+      console.error("Login Resend 2FA Email failed:", err);
+    });
+
+    return res.json({ success: true, message: 'A new OTP has been sent to your registered email.' });
+  } catch (error) {
+    console.error('Resend 2FA error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to resend OTP.' });
   }
 });
 
