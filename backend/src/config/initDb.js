@@ -50,6 +50,17 @@ async function initializeDatabase() {
         console.log('Migration: added last_failed_login_at column to users table.');
       }
 
+      // Ensure otp_code can fit bcrypt hashes (VARCHAR(255))
+      const [otpCheck] = await db.query(`
+        SELECT CHARACTER_MAXIMUM_LENGTH 
+        FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'users' AND column_name = 'otp_code'
+      `, [process.env.DB_NAME]);
+      if (otpCheck.length > 0 && otpCheck[0].CHARACTER_MAXIMUM_LENGTH < 255) {
+        await db.query('ALTER TABLE users MODIFY otp_code VARCHAR(255)');
+        console.log('Migration: expanded otp_code column to VARCHAR(255) to support bcrypt hashes.');
+      }
+
       return;
     }
 
