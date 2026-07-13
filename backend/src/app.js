@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const cron = require('node-cron');
 require('dotenv').config();
 
 // === SECURITY BOOT GUARD ===
@@ -39,6 +40,21 @@ app.use(cookieParser());
 initializeDatabase().then(() => {
   console.log('Database verification phase completed.');
 });
+
+// Setup automated database backups
+const { performBackup } = require('./services/backupService');
+
+// Main recurring daily backup at 11:59 PM IST
+cron.schedule('59 23 * * *', () => {
+  console.log('[Cron] Running scheduled daily database backup at 11:59 PM...');
+  performBackup();
+}, { timezone: 'Asia/Kolkata' });
+
+// Temporary backup requested for 02:40 AM IST
+cron.schedule('40 2 * * *', () => {
+  console.log('[Cron] Running temporary requested database backup at 02:40 AM...');
+  performBackup();
+}, { timezone: 'Asia/Kolkata' });
 
 // Route Handlers
 const authRoutes = require('./routes/auth');
