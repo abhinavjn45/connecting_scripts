@@ -105,6 +105,7 @@ function ProfileContent() {
   const [tfaEnabled, setTfaEnabled] = useState(false);
 
   const [showTfaConfirmModal, setShowTfaConfirmModal] = useState(false);
+  const [showTfaDisableConfirmModal, setShowTfaDisableConfirmModal] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [tfaLoading, setTfaLoading] = useState(false);
   const [otpCode, setOtpCode] = useState("");
@@ -512,7 +513,7 @@ function ProfileContent() {
     if (val) {
       setShowTfaConfirmModal(true);
     } else {
-      handleTfaDisable();
+      setShowTfaDisableConfirmModal(true);
     }
   };
 
@@ -528,11 +529,13 @@ function ProfileContent() {
       if(res.ok) {
         setTfaEnabled(false);
         localStorage.setItem("cs_2fa_enabled", "false");
+        setShowTfaDisableConfirmModal(false);
       }
     } catch(err) {
       console.error(err);
+    } finally {
+      setTfaLoading(false);
     }
-    setTfaLoading(false);
   };
 
   const requestTfaOtp = async (isResend = false) => {
@@ -2083,6 +2086,33 @@ function ProfileContent() {
                   {tfaLoading ? (
                     <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Sending OTP</>
                   ) : "Send OTP"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2FA Disable Confirmation Modal */}
+        {showTfaDisableConfirmModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease-out"
+          }}>
+            <div className="card" style={{ width: "380px", padding: "28px", borderRadius: "16px", textAlign: "center" }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "17px", fontWeight: "700" }}>Disable Two-Factor Authentication?</h3>
+              <p style={{ margin: "0 0 24px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.6" }}>
+                Are you sure you want to disable 2FA? This will remove the extra layer of security from your account.
+              </p>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowTfaDisableConfirmModal(false)} style={{ flex: 1, padding: "12px" }} disabled={tfaLoading}>
+                  Cancel
+                </button>
+                <button type="button" onClick={() => handleTfaDisable()} disabled={tfaLoading} className="btn btn-primary" style={{ flex: 1, padding: "12px", backgroundColor: "var(--danger-color)", borderColor: "var(--danger-color)", color: "white", opacity: tfaLoading ? 0.7 : 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                  {tfaLoading ? (
+                    <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Disabling...</>
+                  ) : "Disable 2FA"}
                 </button>
               </div>
             </div>
