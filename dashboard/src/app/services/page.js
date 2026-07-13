@@ -8,7 +8,7 @@ export default function ServicesPage() {
       <div className="card">
         <h2>Services Management</h2>
         <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
-          Configure, add, edit, or remove SEOC agency marketing and optimization services displayed on the front-end.
+          Configure, add, edit, or remove Connecting Scripts agency marketing and optimization services displayed on the front-end.
         </p>
       </div>
     </AdminLayout>

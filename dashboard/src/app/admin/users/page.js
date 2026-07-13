@@ -127,7 +127,7 @@ export default function UserManagementPage() {
     setModalLoading(true);
     setModalMsg({ type: "", text: "" });
 
-    const token = localStorage.getItem("seoc_jwt_token");
+    const token = localStorage.getItem("cs_jwt_token");
 
     try {
       if (editingUser) {

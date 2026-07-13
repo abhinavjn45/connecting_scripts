@@ -23,7 +23,7 @@ export default function BlogsPage() {
 
   useEffect(() => {
     const loadPermissions = () => {
-      const stored = localStorage.getItem("seoc_rbac_permissions");
+      const stored = localStorage.getItem("cs_rbac_permissions");
       if (stored) {
         try {
           const perms = JSON.parse(stored);

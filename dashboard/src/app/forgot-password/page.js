@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
         <div className="login-left-content">
           <div className="login-logo">
             <span className="login-logo-icon">S</span>
-            <span>SEOC Admin</span>
+            <span>Connecting Scripts Admin</span>
           </div>
           
           <div style={{ marginTop: "100px" }}>
@@ -151,7 +151,7 @@ export default function ForgotPasswordPage() {
                     type="email"
                     id="email"
                     className="form-input"
-                    placeholder="admin@seocagency.com"
+                    placeholder="admin@connectingscripts.co.in"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(""); }}
                     required

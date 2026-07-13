@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "SEOC - Admin Dashboard",
+  title: "Connecting Scripts - Admin Dashboard",
   description: "Manage your SEO and digital marketing website data.",
 };
 

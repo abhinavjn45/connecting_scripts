@@ -63,8 +63,8 @@ export default function Sidebar({ isOpen, toggleSidebar, permissions = {} }) {
         {/* Top Header Section */}
         <div className="sidebar-header">
           <Link href="/" className="logo-area">
-            <span className="logo-icon">S</span>
-            <span>SEOC Admin</span>
+            <span className="logo-icon">CS</span>
+            <span>Connecting Scripts Admin</span>
           </Link>
           <button className="hamburger-btn" onClick={toggleSidebar}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

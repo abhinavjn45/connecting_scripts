@@ -13,7 +13,7 @@ function ProfileContent() {
 
   useEffect(() => {
     if (tabParam && ["details", "security", "notifications", "activity"].includes(tabParam)) {
-      setActiveTab(tabParam);
+      setTimeout(() => setActiveTab(tabParam), 0);
     }
   }, [tabParam]);
 
@@ -103,6 +103,41 @@ function ProfileContent() {
 
   // Security & 2FA State
   const [tfaEnabled, setTfaEnabled] = useState(false);
+
+  const [showTfaConfirmModal, setShowTfaConfirmModal] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [tfaLoading, setTfaLoading] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpPhase, setOtpPhase] = useState("idle");
+  const [otpMsg, setOtpMsg] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
+  const [resendAttempts, setResendAttempts] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+  const [resendDots, setResendDots] = useState("");
+
+  useEffect(() => {
+    let interval;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer(t => t - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  useEffect(() => {
+    let interval;
+    if (isResending) {
+      interval = setInterval(() => {
+        setResendDots(prev => prev.length >= 3 ? "" : prev + ".");
+      }, 500);
+    } else {
+      setTimeout(() => setResendDots(""), 0);
+    }
+    return () => clearInterval(interval);
+  }, [isResending]);
+
+
   const [sessionList, setSessionList] = useState([
     { id: 1, device: "Windows Desktop", browser: "Chrome 124.0", ip: "192.168.1.45", current: true },
     { id: 2, device: "Apple iPhone 15 Pro", browser: "Safari Mobile", ip: "172.56.21.90", current: false },
@@ -239,7 +274,7 @@ function ProfileContent() {
   // Fetch real profile details and permission matrix from database on mount
   useEffect(() => {
     const fetchProfile = async () => {
-      const loggedIn = localStorage.getItem("seoc_is_logged_in");
+      const loggedIn = localStorage.getItem("cs_is_logged_in");
       if (loggedIn !== "true") return;
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
@@ -279,9 +314,9 @@ function ProfileContent() {
           setUserStatus(data.user.status || "Active");
 
           // Sync locally for sidebars
-          localStorage.setItem("seoc_rbac_role", data.user.role);
-          localStorage.setItem("seoc_rbac_permissions", JSON.stringify(data.permissions));
-          localStorage.setItem("seoc_2fa_enabled", data.user.twoFactorEnabled ? "true" : "false");
+          localStorage.setItem("cs_rbac_role", data.user.role);
+          localStorage.setItem("cs_rbac_permissions", JSON.stringify(data.permissions));
+          localStorage.setItem("cs_2fa_enabled", data.user.twoFactorEnabled ? "true" : "false");
           window.dispatchEvent(new Event("rbac-update"));
         }
       } catch (err) {
@@ -340,8 +375,8 @@ function ProfileContent() {
         body: JSON.stringify({ role: roleName, permissions: perms })
       });
       if (res.ok) {
-        localStorage.setItem("seoc_rbac_role", roleName);
-        localStorage.setItem("seoc_rbac_permissions", JSON.stringify(perms));
+        localStorage.setItem("cs_rbac_role", roleName);
+        localStorage.setItem("cs_rbac_permissions", JSON.stringify(perms));
         window.dispatchEvent(new Event("rbac-update"));
       }
     } catch (err) {
@@ -472,23 +507,100 @@ function ProfileContent() {
     }, 1000);
   };
 
-  const handleTfaToggle = async (val) => {
-    setTfaEnabled(val);
-    localStorage.setItem("seoc_2fa_enabled", val ? "true" : "false");
-    
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/tfa`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({ twoFactorEnabled: val })
-      });
-    } catch (err) {
-      console.error("Failed to sync 2FA status to database:", err);
+  
+  const handleTfaToggleClick = (val) => {
+    if (val) {
+      setShowTfaConfirmModal(true);
+    } else {
+      handleTfaDisable();
     }
   };
+
+  const handleTfaDisable = async () => {
+    setTfaLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/tfa`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ twoFactorEnabled: false })
+      });
+      if(res.ok) {
+        setTfaEnabled(false);
+        localStorage.setItem("cs_2fa_enabled", "false");
+      }
+    } catch(err) {
+      console.error(err);
+    }
+    setTfaLoading(false);
+  };
+
+  const requestTfaOtp = async (isResend = false) => {
+    if (isResend) setIsResending(true);
+    else setTfaLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/2fa/request`, {
+        method: "POST",
+        credentials: "include"
+      });
+      const data = await res.json();
+      if(data.success) {
+        setShowTfaConfirmModal(false);
+        setShowOtpModal(true);
+        setOtpPhase("idle");
+        setOtpMsg("");
+        setOtpCode("");
+        if (!isResend) {
+          setResendAttempts(1);
+          setResendTimer(30);
+        } else {
+          const waitTimes = [30, 60, 120];
+          const wait = waitTimes[Math.min(resendAttempts, 2)];
+          setResendTimer(wait);
+          setResendAttempts(a => a + 1);
+        }
+      }
+    } catch(err) {
+      console.error(err);
+    }
+    if (isResend) setIsResending(false);
+    else setTfaLoading(false);
+  };
+
+  const verifyTfaOtp = async () => {
+    if (otpCode.length !== 6) {
+      setOtpPhase("error");
+      setOtpMsg("Please enter a 6-digit code");
+      return;
+    }
+    setOtpPhase("loading");
+    setOtpMsg("");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/2fa/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ otpCode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpPhase("success");
+        setOtpMsg("2FA successfully enabled!");
+        setTimeout(() => {
+          setTfaEnabled(true);
+          localStorage.setItem("cs_2fa_enabled", "true");
+          setShowOtpModal(false);
+        }, 1500);
+      } else {
+        setOtpPhase("error");
+        setOtpMsg(data.message || "Invalid OTP");
+      }
+    } catch(err) {
+      setOtpPhase("error");
+      setOtpMsg("Connection error");
+    }
+  };
+
 
   const handleRevokeSession = (id) => {
     setSessionList(sessionList.filter((s) => s.id !== id));
@@ -504,8 +616,8 @@ function ProfileContent() {
     } catch (e) {
       console.error("Logout error", e);
     }
-    localStorage.removeItem("seoc_jwt_token");
-    localStorage.removeItem("seoc_is_logged_in");
+    localStorage.removeItem("cs_jwt_token");
+    localStorage.removeItem("cs_is_logged_in");
     window.location.href = "/login";
   };
 
@@ -1162,7 +1274,7 @@ function ProfileContent() {
                   <input 
                     type="checkbox" 
                     checked={tfaEnabled} 
-                    onChange={(e) => handleTfaToggle(e.target.checked)} 
+                    onChange={(e) => handleTfaToggleClick(e.target.checked)} disabled={tfaLoading} 
                   />
                   <span className="switch-slider"></span>
                 </label>
@@ -1949,7 +2061,104 @@ function ProfileContent() {
       )}
 
       {/* Logout Confirmation Modal */}
-      {showLogoutModal && (
+      
+        {/* 2FA Confirmation Modal */}
+        {showTfaConfirmModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease-out"
+          }}>
+            <div className="card" style={{ width: "380px", padding: "28px", borderRadius: "16px", textAlign: "center" }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "17px", fontWeight: "700" }}>Enable Two-Factor Authentication</h3>
+              <p style={{ margin: "0 0 24px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.6" }}>
+                We will send a 6-digit OTP to your registered email address to verify your identity.
+              </p>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowTfaConfirmModal(false); setResendAttempts(0); setResendTimer(0); }} style={{ flex: 1, padding: "12px" }} disabled={tfaLoading}>
+                  Cancel
+                </button>
+                <button type="button" onClick={() => requestTfaOtp()} disabled={tfaLoading} className="btn btn-primary" style={{ flex: 1, padding: "12px", opacity: tfaLoading ? 0.7 : 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                  {tfaLoading ? (
+                    <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Sending OTP</>
+                  ) : "Send OTP"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* OTP Verification Modal */}
+        {showOtpModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease-out"
+          }}>
+            <div className="card" style={{ width: "380px", padding: "28px", borderRadius: "16px", textAlign: "center" }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "17px", fontWeight: "700" }}>Enter OTP Code</h3>
+              <p style={{ margin: "0 0 24px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.6" }}>
+                Please enter the 6-digit code sent to your email. It expires in 10 minutes.
+              </p>
+              
+              <input 
+                type="text" 
+                maxLength="6" 
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="------"
+                style={{
+                  width: "100%", padding: "12px", fontSize: "24px", letterSpacing: "8px", 
+                  textAlign: "center", borderRadius: "8px", border: "1px solid var(--border-color)",
+                  marginBottom: "16px", background: "var(--bg-color)", color: "var(--text-color)"
+                }}
+                disabled={otpPhase === "loading" || otpPhase === "success"}
+              />
+
+              {otpMsg && (
+                <div style={{ marginBottom: "16px", fontSize: "13px", fontWeight: "600", color: otpPhase === "error" ? "var(--danger-color)" : "var(--success-color)" }}>
+                  {otpMsg}
+                </div>
+              )}
+
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={verifyTfaOtp} 
+                disabled={otpCode.length !== 6 || otpPhase === "loading" || otpPhase === "success"}
+                style={{ width: "100%", padding: "12px", marginBottom: "12px", display: "flex", justifyContent: "center", alignItems: "center" }}
+              >
+                {otpPhase === "loading" ? (
+                  <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Verifying...</>
+                ) : otpPhase === "success" ? "Verified" : "Verify & Enable"}
+              </button>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px" }}>
+                <button type="button" className="btn" onClick={() => { 
+                    setShowOtpModal(false); 
+                    setTfaEnabled(false); 
+                    setResendAttempts(0);
+                    setResendTimer(0);
+                  }} style={{ fontSize: "13px", padding: 0, background: "none", border: "none", color: "var(--text-muted)" }}>
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={() => requestTfaOtp(true)}
+                  disabled={isResending || resendTimer > 0 || tfaLoading}
+                  style={{ fontSize: "13px", padding: 0, background: "none", border: "none", color: resendTimer > 0 ? "var(--text-muted)" : "var(--primary-color)", fontWeight: "600" }}
+                >
+                  {isResending ? `Resending OTP${resendDots}` : resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : "Resend OTP"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showLogoutModal && (
         <div style={{
           position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
           backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",

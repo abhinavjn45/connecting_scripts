@@ -200,17 +200,90 @@ router.put('/', verifyToken, async (req, res) => {
   }
 });
 
-// 3. PUT /api/profile/tfa
+// 3. PUT /api/profile/tfa (Used for disabling 2FA)
 router.put('/tfa', verifyToken, async (req, res) => {
   const userId = req.user.userId;
   const { twoFactorEnabled } = req.body;
 
+  if (twoFactorEnabled) {
+    return res.status(400).json({ success: false, message: 'Please use the OTP verification flow to enable 2FA.' });
+  }
+
   try {
-    await db.query('UPDATE users SET two_factor_enabled = ? WHERE id = ?', [twoFactorEnabled ? 1 : 0, userId]);
-    return res.json({ success: true, message: `Two-Factor Authentication toggled ${twoFactorEnabled ? 'ON' : 'OFF'}.` });
+    await db.query('UPDATE users SET two_factor_enabled = 0, otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userId]);
+    return res.json({ success: true, message: 'Two-Factor Authentication disabled successfully.' });
   } catch (error) {
-    console.error('Error toggling 2FA:', error);
+    console.error('Error disabling 2FA:', error);
     return res.status(500).json({ success: false, message: 'Failed to update 2FA status.' });
+  }
+});
+
+const { send2FAEmail } = require('../services/emailService');
+
+// 3a. POST /api/profile/2fa/request
+router.post('/2fa/request', verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const [users] = await db.query('SELECT first_name, company_email, personal_email FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const user = users[0];
+    
+    // Generate a secure 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Save to database, expires in 10 minutes
+    await db.query(
+      'UPDATE users SET otp_code = ?, otp_expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE id = ?', 
+      [otpCode, userId]
+    );
+
+    // Send the email (using personal_email temporarily as requested)
+    const targetEmail = user.personal_email || user.company_email;
+    const emailResult = await send2FAEmail(targetEmail, user.first_name, otpCode);
+    
+    if (!emailResult.success) {
+      throw emailResult.error;
+    }
+
+    return res.json({ success: true, message: 'OTP sent successfully to your registered email.' });
+  } catch (error) {
+    console.error('Error requesting 2FA OTP:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send OTP email.' });
+  }
+});
+
+// 3b. POST /api/profile/2fa/verify
+router.post('/2fa/verify', verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { otpCode } = req.body;
+
+  if (!otpCode || otpCode.length !== 6) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid 6-digit OTP.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT otp_code, otp_expires_at FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const user = users[0];
+
+    if (!user.otp_code || user.otp_code !== otpCode) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code.' });
+    }
+
+    if (new Date() > new Date(user.otp_expires_at)) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    // OTP is valid, enable 2FA and clear OTP fields
+    await db.query('UPDATE users SET two_factor_enabled = 1, otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userId]);
+
+    return res.json({ success: true, message: 'Two-Factor Authentication has been successfully enabled.' });
+  } catch (error) {
+    console.error('Error verifying 2FA OTP:', error);
+    return res.status(500).json({ success: false, message: 'Failed to verify OTP.' });
   }
 });
 

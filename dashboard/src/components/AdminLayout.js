@@ -22,7 +22,7 @@ export default function AdminLayout({ children, title }) {
   const [user, setUser] = useState({
     firstName: "Administrator",
     lastName: "User",
-    email: "admin@seocagency.com",
+    email: "admin@connectingscripts.co.in",
     role: "Super Admin"
   });
 
@@ -44,7 +44,7 @@ export default function AdminLayout({ children, title }) {
 
   useEffect(() => {
     const verifyAndLoad = async () => {
-      const loggedIn = localStorage.getItem("seoc_is_logged_in");
+      const loggedIn = localStorage.getItem("cs_is_logged_in");
 
       // Step 1: Fast local check — if they didn't even pass login screen, redirect
       if (loggedIn !== "true") {
@@ -60,9 +60,9 @@ export default function AdminLayout({ children, title }) {
 
         if (res.status === 401 || res.status === 403) {
           // Token invalid, expired, or revoked — force logout
-          localStorage.removeItem("seoc_is_logged_in");
-          localStorage.removeItem("seoc_rbac_role");
-          localStorage.removeItem("seoc_rbac_permissions");
+          localStorage.removeItem("cs_is_logged_in");
+          localStorage.removeItem("cs_rbac_role");
+          localStorage.removeItem("cs_rbac_permissions");
           router.replace("/login?reason=session_expired");
           return;
         }
@@ -70,7 +70,7 @@ export default function AdminLayout({ children, title }) {
         if (!res.ok) {
           // Backend is down or returned an unexpected error
           // Still force logout — do not silently allow dashboard access
-          localStorage.removeItem("seoc_is_logged_in");
+          localStorage.removeItem("cs_is_logged_in");
           router.replace("/login?reason=server_unavailable");
           return;
         }
@@ -81,12 +81,12 @@ export default function AdminLayout({ children, title }) {
           setPermissions(data.permissions || {});
 
           // Keep local cache in sync
-          localStorage.setItem("seoc_rbac_role", data.user.role);
-          localStorage.setItem("seoc_rbac_permissions", JSON.stringify(data.permissions));
+          localStorage.setItem("cs_rbac_role", data.user.role);
+          localStorage.setItem("cs_rbac_permissions", JSON.stringify(data.permissions));
         }
       } catch {
         // Network error (backend completely unreachable) — force logout
-        localStorage.removeItem("seoc_is_logged_in");
+        localStorage.removeItem("cs_is_logged_in");
         router.replace("/login?reason=server_unavailable");
         return;
       }
@@ -291,9 +291,9 @@ export default function AdminLayout({ children, title }) {
                   className="dropdown-item logout" 
                   onClick={() => {
                     setProfileOpen(false);
-                    localStorage.removeItem("seoc_is_logged_in");
-                    localStorage.removeItem("seoc_rbac_role");
-                    localStorage.removeItem("seoc_rbac_permissions");
+                    localStorage.removeItem("cs_is_logged_in");
+                    localStorage.removeItem("cs_rbac_role");
+                    localStorage.removeItem("cs_rbac_permissions");
                     router.push("/login");
                     
                     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
@@ -325,7 +325,7 @@ export default function AdminLayout({ children, title }) {
               </div>
               <h2 style={{ fontSize: "24px", fontWeight: "800", marginBottom: "12px", color: "var(--text-color)" }}>Access Denied</h2>
               <p style={{ color: "var(--text-muted)", fontSize: "14px", lineHeight: "1.6", marginBottom: "28px" }}>
-                You do not have the required permissions to access this section of the SEOC Administration Workspace. Please contact your system administrator to request access.
+                You do not have the required permissions to access this section of the Connecting Scripts Administration Workspace. Please contact your system administrator to request access.
               </p>
               <Link href="/" className="btn btn-primary" style={{ textDecoration: "none", display: "inline-flex" }}>
                 Return to Dashboard
@@ -337,7 +337,7 @@ export default function AdminLayout({ children, title }) {
         {/* Layout Footer */}
         <footer className="admin-footer">
           <div>
-            <span>© 2026 <strong>SEOC</strong>. All Rights Reserved.</span>
+            <span>© 2026 <strong>Connecting Scripts</strong>. All Rights Reserved.</span>
           </div>
           <div>
             <span>Developed by <strong>Connecting Scripts</strong></span>

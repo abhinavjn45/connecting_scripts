@@ -7,7 +7,7 @@ export default function SiteHealthPage() {
       <div className="card" style={{ marginBottom: "24px" }}>
         <h2>Site Health Summary</h2>
         <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
-          Monitor live server metrics, database performance metrics, and SSL certificates to ensure SEOC remains fully functional.
+          Monitor live server metrics, database performance metrics, and SSL certificates to ensure Connecting Scripts remains fully functional.
         </p>
       </div>
 

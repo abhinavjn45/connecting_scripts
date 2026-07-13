@@ -67,7 +67,7 @@ function LoginContent() {
       const data = await res.json();
       
       if (!res.ok) {
-        setError(data.message || "Invalid credentials. Hint: Use admin@seocagency.com / admin123");
+        setError(data.message || "Invalid credentials. Hint: Use admin@connectingscripts.co.in / admin123");
         return;
       }
 
@@ -76,8 +76,8 @@ function LoginContent() {
         setInfo("Multi-factor authentication required. Check your backend console for the OTP code.");
         setError("");
       } else {
-        localStorage.setItem("seoc_is_logged_in", "true");
-        localStorage.setItem("seoc_rbac_role", data.user?.role || "Super Admin");
+        localStorage.setItem("cs_is_logged_in", "true");
+        localStorage.setItem("cs_rbac_role", data.user?.role || "Super Admin");
         
         // Dispatch local events to sync sidebar immediately
         window.dispatchEvent(new Event("rbac-update"));
@@ -132,8 +132,8 @@ function LoginContent() {
         return;
       }
 
-      localStorage.setItem("seoc_is_logged_in", "true");
-      localStorage.setItem("seoc_rbac_role", data.user?.role || "Super Admin");
+      localStorage.setItem("cs_is_logged_in", "true");
+      localStorage.setItem("cs_rbac_role", data.user?.role || "Super Admin");
       
       window.dispatchEvent(new Event("rbac-update"));
       router.push("/");
@@ -151,7 +151,7 @@ function LoginContent() {
         <div className="login-left-content">
           <div className="login-logo">
             <span className="login-logo-icon">S</span>
-            <span>SEOC Admin</span>
+            <span>Connecting Scripts Admin</span>
           </div>
           
           <div style={{ marginTop: "100px" }}>

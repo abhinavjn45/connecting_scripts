@@ -58,7 +58,7 @@ app.get('/health', (req, res) => {
 
 // Root Route
 app.get('/', (req, res) => {
-  res.send('SEOC Backend API is running successfully with MySQL connection.');
+  res.send('Connecting Scripts Backend API is running successfully with MySQL connection.');
 });
 
 // Global Error Handler

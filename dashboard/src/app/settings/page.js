@@ -4,7 +4,7 @@ import AdminLayout from "../../components/AdminLayout";
 import { useState } from "react";
 
 export default function SettingsPage() {
-  const [seoTitle, setSeoTitle] = useState("SEOC - Digital Marketing Agency");
+  const [seoTitle, setSeoTitle] = useState("Connecting Scripts - Digital Marketing Agency");
   const [seoDescription, setSeoDescription] = useState("We specialize in revolutionizing your online presence through expert SEO and digital marketing solutions.");
   const [seoKeywords, setSeoKeywords] = useState("seo, marketing, design, digital marketing agency");
   const [logoUrl, setLogoUrl] = useState("/assets/img/logo/logo1.png");

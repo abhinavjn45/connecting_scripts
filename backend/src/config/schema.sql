@@ -1,5 +1,5 @@
 -- Role-Based Access Control (RBAC) & CRUD Permission Matrix Database Schema
--- Database: seoc_agency_db
+-- Database: connecting_scripts_db
 -- Generated on: 2026-07-12
 
 -- 1. Create Users Table
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `profile_image` VARCHAR(255) NULL COMMENT 'File system path or CDN URL',
   
   -- OTP & Verification
-  `otp_code` VARCHAR(10) NULL COMMENT 'One-Time Password for password recovery/2FA',
+  `otp_code` VARCHAR(255) NULL COMMENT 'Hashed One-Time Password for password recovery/2FA',
   `otp_expires_at` DATETIME NULL COMMENT 'OTP Expiration timestamp',
   `two_factor_enabled` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '2FA status toggle',
   
