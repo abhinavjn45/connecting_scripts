@@ -1264,9 +1264,14 @@ function ProfileContent() {
               </div>
 
               <div style={{ marginTop: "10px", paddingTop: "20px", borderTop: "1px solid var(--border-color)" }}>
-                <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px" }} disabled={savingSettings}>
-                  {savingSettings ? "Saving Settings..." : "Save Configuration"}
-                </button>
+                <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px", opacity: savingSettings ? 0.7 : 1, cursor: savingSettings ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={savingSettings}>
+                    {savingSettings ? (
+                      <>
+                        <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                        Saving Settings...
+                      </>
+                    ) : "Save Configuration"}
+                  </button>
               </div>
             </form>
           )}
@@ -1313,9 +1318,14 @@ function ProfileContent() {
               </div>
 
               <div style={{ marginTop: "10px", paddingTop: "20px", borderTop: "1px solid var(--border-color)" }}>
-                <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px" }} disabled={savingSettings}>
-                  {savingSettings ? "Saving Settings..." : "Save Configuration"}
-                </button>
+                <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px", opacity: savingSettings ? 0.7 : 1, cursor: savingSettings ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={savingSettings}>
+                    {savingSettings ? (
+                      <>
+                        <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                        Saving Settings...
+                      </>
+                    ) : "Save Configuration"}
+                  </button>
               </div>
             </form>
           )}
@@ -1973,11 +1983,16 @@ function ProfileContent() {
                 style={{ 
                   flex: 1, padding: "12px", fontSize: "14px", fontWeight: "600", 
                   backgroundColor: "var(--danger-color)", color: "#fff", 
-                  border: "none", borderRadius: "8px", cursor: "pointer", 
-                  transition: "var(--transition)" 
+                  border: "none", borderRadius: "8px", cursor: logoutLoading ? "not-allowed" : "pointer", opacity: logoutLoading ? 0.7 : 1, 
+                  transition: "var(--transition)", display: "flex", alignItems: "center", justifyContent: "center" 
                 }}
               >
-                {logoutLoading ? "Logging out..." : "Yes, Logout"}
+                {logoutLoading ? (
+                  <>
+                    <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                    Logging out...
+                  </>
+                ) : "Yes, Logout"}
               </button>
             </div>
           </div>

@@ -264,8 +264,13 @@ function LoginContent() {
                   </Link>
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }} disabled={isLoading}>
-                  {isLoading ? "Signing In..." : "Sign In"}
+                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                      Signing In...
+                    </>
+                  ) : "Sign In"}
                 </button>
               </form>
             </>
@@ -319,8 +324,13 @@ function LoginContent() {
                   ))}
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", marginBottom: "16px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }} disabled={isLoading}>
-                  {isLoading ? "Verifying..." : "Verify & Log In"}
+                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", marginBottom: "16px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                      Verifying...
+                    </>
+                  ) : "Verify & Log In"}
                 </button>
 
                 <button

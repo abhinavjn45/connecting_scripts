@@ -643,10 +643,13 @@ export default function UserManagementPage() {
                 <button type="button" className="btn btn-secondary" onClick={closeModal} style={{ flex: 1, padding: "12px" }} disabled={modalLoading}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 2, padding: "12px" }} disabled={modalLoading}>
-                  {modalLoading
-                    ? (editingUser ? "Saving..." : "Creating...")
-                    : (editingUser ? "Save Changes" : "Create User")}
+                <button type="submit" className="btn btn-primary" style={{ flex: 2, padding: "12px", opacity: modalLoading ? 0.7 : 1, cursor: modalLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={modalLoading}>
+                  {modalLoading ? (
+                    <>
+                      <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                      {editingUser ? "Saving..." : "Creating..."}
+                    </>
+                  ) : (editingUser ? "Save Changes" : "Create User")}
                 </button>
               </div>
             </form>
@@ -693,11 +696,16 @@ export default function UserManagementPage() {
                 style={{
                   flex: 1, padding: "12px", fontSize: "14px", fontWeight: "600",
                   backgroundColor: "var(--danger-color)", color: "#fff",
-                  border: "none", borderRadius: "8px", cursor: "pointer",
-                  transition: "var(--transition)"
+                  border: "none", borderRadius: "8px", cursor: deleteLoading ? "not-allowed" : "pointer", opacity: deleteLoading ? 0.7 : 1,
+                  transition: "var(--transition)", display: "flex", alignItems: "center", justifyContent: "center"
                 }}
               >
-                {deleteLoading ? "Deleting..." : "Yes, Delete"}
+                {deleteLoading ? (
+                  <>
+                    <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                    Deleting...
+                  </>
+                ) : "Yes, Delete"}
               </button>
             </div>
           </div>

@@ -289,18 +289,17 @@ export default function AdminLayout({ children, title }) {
                 </Link>
                 <button 
                   className="dropdown-item logout" 
-                  onClick={async () => {
+                  onClick={() => {
                     setProfileOpen(false);
-                    try {
-                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
-                        method: "POST",
-                        credentials: "include"
-                      });
-                    } catch (e) {
-                      console.error("Logout API error:", e);
-                    }
                     localStorage.removeItem("seoc_is_logged_in");
-                    router.push("/login"); 
+                    localStorage.removeItem("seoc_rbac_role");
+                    localStorage.removeItem("seoc_rbac_permissions");
+                    router.push("/login");
+                    
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {
+                      method: "POST",
+                      credentials: "include"
+                    }).catch(e => console.error("Logout API error:", e));
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
