@@ -1,7 +1,9 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Sends a 2FA OTP Email using Nodemailer and Hostinger SMTP
+ * Sends a 2FA OTP Email using Resend
  * 
  * @param {string} toEmail - The recipient's email address
  * @param {string} userName - The name of the user for greeting
@@ -9,21 +11,7 @@ const nodemailer = require('nodemailer');
  */
 const send2FAEmail = async (toEmail, userName, otpCode) => {
   try {
-    // Hostinger SMTP Configuration
-    const transporter = nodemailer.createTransport({
-      pool: true,
-      maxConnections: 5,
-      maxMessages: 100,
-      host: process.env.SMTP_HOST || 'smtp.hostinger.com',
-      port: parseInt(process.env.SMTP_PORT) || 465,
-      secure: (parseInt(process.env.SMTP_PORT) || 465) === 465, // true for 465, false for 587
-      auth: {
-        user: process.env.SMTP_USER, // e.g. security.csd@audix.site
-        pass: process.env.SMTP_PASS, // Your Hostinger webmail password
-      },
-    });
-
-    const senderEmail = process.env.SMTP_USER || 'security.csd@audix.site';
+    const senderEmail = process.env.SENDER_EMAIL || 'security.csd@audix.site';
 
     const htmlTemplate = `
       <div style="font-family: 'Inter', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffffff; border-radius: 12px; border: 1px solid #eef2f6; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
@@ -58,16 +46,21 @@ const send2FAEmail = async (toEmail, userName, otpCode) => {
       </div>
     `;
 
-    const info = await transporter.sendMail({
-      from: `"Connecting Scripts Security" <${senderEmail}>`,
-      to: toEmail,
+    const response = await resend.emails.send({
+      from: `Connecting Scripts Security <${senderEmail}>`,
+      to: [toEmail],
       subject: 'Your 2FA Verification Code - Connecting Scripts',
       html: htmlTemplate,
     });
 
-    return { success: true, messageId: info.messageId };
+    if (response.error) {
+      console.error('Resend Error Payload:', response.error);
+      throw new Error(response.error.message);
+    }
+
+    return { success: true, data: response.data };
   } catch (error) {
-    console.error('Email sending error:', error);
+    console.error('Email sending error via Resend:', error);
     return { success: false, error };
   }
 };
