@@ -11,9 +11,12 @@ const send2FAEmail = async (toEmail, userName, otpCode) => {
   try {
     // Hostinger SMTP Configuration
     const transporter = nodemailer.createTransport({
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
       host: process.env.SMTP_HOST || 'smtp.hostinger.com',
-      port: process.env.SMTP_PORT || 465,
-      secure: true, // true for 465, false for other ports
+      port: parseInt(process.env.SMTP_PORT) || 465,
+      secure: (parseInt(process.env.SMTP_PORT) || 465) === 465, // true for 465, false for 587
       auth: {
         user: process.env.SMTP_USER, // e.g. security.csd@audix.site
         pass: process.env.SMTP_PASS, // Your Hostinger webmail password
@@ -62,7 +65,7 @@ const send2FAEmail = async (toEmail, userName, otpCode) => {
       html: htmlTemplate,
     });
 
-    return { success: true, data: info };
+    return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Email sending error:', error);
     return { success: false, error };

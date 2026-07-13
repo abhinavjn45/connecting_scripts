@@ -239,13 +239,11 @@ router.post('/2fa/request', verifyToken, async (req, res) => {
       [otpCode, userId]
     );
 
-    // Send the email (using personal_email temporarily as requested)
+    // Send the email in the background (fire-and-forget for instant UI response)
     const targetEmail = user.personal_email || user.company_email;
-    const emailResult = await send2FAEmail(targetEmail, user.first_name, otpCode);
-    
-    if (!emailResult.success) {
-      throw emailResult.error;
-    }
+    send2FAEmail(targetEmail, user.first_name, otpCode).catch(err => {
+      console.error("Background 2FA Email failed:", err);
+    });
 
     return res.json({ success: true, message: 'OTP sent successfully to your registered email.' });
   } catch (error) {
