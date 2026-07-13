@@ -259,7 +259,7 @@ function LoginContent() {
                     <input type="checkbox" />
                     <span>Remember Me</span>
                   </label>
-                  <Link href="/forgot-password" style={{ color: "var(--primary-color)", fontSize: "13px", fontWeight: "600", textDecoration: "none" }}>
+                  <Link href="/forgot-password" style={{ color: "var(--primary-color)", fontSize: "13px", fontWeight: "600", textDecoration: "none", pointerEvents: isLoading ? "none" : "auto", opacity: isLoading ? 0.5 : 1 }}>
                     Forgot Password?
                   </Link>
                 </div>
