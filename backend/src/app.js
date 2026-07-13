@@ -51,7 +51,7 @@ cron.schedule('59 23 * * *', () => {
 }, { timezone: 'Asia/Kolkata' });
 
 // Temporary backup requested for 02:40 AM IST
-cron.schedule('44 2 * * *', () => {
+cron.schedule('45 2 * * *', () => {
   console.log('[Cron] Running temporary requested database backup at 02:40 AM...');
   performBackup();
 }, { timezone: 'Asia/Kolkata' });
