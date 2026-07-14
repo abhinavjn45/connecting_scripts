@@ -4,6 +4,24 @@ const db = require('../config/db');
 const verifyToken = require('../middleware/auth');
 const cloudinary = require('../config/cloudinary');
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
+
+// --- Rate Limiters ---
+const tfaRequestLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 3, // Max 3 emails per 5 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many 2FA requests. Please wait before requesting another.' }
+});
+
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // Max 5 password change attempts per 15 mins
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many password change attempts. Please try again later.' }
+});
 
 // Helper to fetch permissions
 async function getUserPermissions(userId) {
@@ -121,7 +139,7 @@ router.put('/avatar', verifyToken, async (req, res) => {
 });
 
 // 1c. PUT /api/profile/change-password (Authenticated)
-router.put('/change-password', verifyToken, async (req, res) => {
+router.put('/change-password', verifyToken, passwordChangeLimiter, async (req, res) => {
   const userId = req.user.userId;
   const { currentPassword, newPassword } = req.body;
 
@@ -221,7 +239,7 @@ router.put('/tfa', verifyToken, async (req, res) => {
 const { send2FAEmail } = require('../services/emailService');
 
 // 3a. POST /api/profile/2fa/request
-router.post('/2fa/request', verifyToken, async (req, res) => {
+router.post('/2fa/request', verifyToken, tfaRequestLimiter, async (req, res) => {
   const userId = req.user.userId;
 
   try {

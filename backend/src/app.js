@@ -31,6 +31,20 @@ app.use(cors({
   credentials: true
 }));
 
+// Strict CSRF Protection Middleware for non-GET requests
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    const origin = req.headers.origin || req.headers.referer;
+    const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    
+    if (origin && !origin.startsWith(allowedOrigin)) {
+      console.warn(`[SECURITY] Blocked CSRF attempt from origin: ${origin}`);
+      return res.status(403).json({ success: false, message: 'CSRF validation failed: Invalid Origin.' });
+    }
+  }
+  next();
+});
+
 // Body and Cookie Parsing Middleware
 app.use(express.json({ limit: '50kb' }));
 app.use(express.urlencoded({ extended: true, limit: '50kb' }));
