@@ -252,10 +252,13 @@ router.post('/2fa/request', verifyToken, tfaRequestLimiter, async (req, res) => 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
     
+    // Hash the OTP before saving it to the database
+    const hashedOtp = await bcrypt.hash(otpCode, 8);
+    
     // Save to database
     await db.query(
       'UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', 
-      [otpCode, otpExpires, userId]
+      [hashedOtp, otpExpires, userId]
     );
 
     // Send the email in the background (fire-and-forget for instant UI response)
@@ -286,7 +289,12 @@ router.post('/2fa/verify', verifyToken, async (req, res) => {
 
     const user = users[0];
 
-    if (!user.otp_code || user.otp_code !== otpCode) {
+    if (!user.otp_code) {
+      return res.status(400).json({ success: false, message: 'No active OTP found. Please request a new one.' });
+    }
+
+    const isValid = await bcrypt.compare(otpCode, user.otp_code);
+    if (!isValid) {
       return res.status(400).json({ success: false, message: 'Invalid OTP code.' });
     }
 
