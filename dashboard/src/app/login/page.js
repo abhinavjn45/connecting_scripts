@@ -16,6 +16,7 @@ function LoginContent() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [resendAttempts, setResendAttempts] = useState(0);
@@ -297,19 +298,29 @@ function LoginContent() {
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                   <label className="remember-me">
-                    <input type="checkbox" />
+                    <input type="checkbox" disabled={isLoading || isRedirecting} />
                     <span>Remember Me</span>
                   </label>
-                  <Link href="/forgot-password" style={{ color: "var(--primary-color)", fontSize: "13px", fontWeight: "600", textDecoration: "none", pointerEvents: isLoading ? "none" : "auto", opacity: isLoading ? 0.5 : 1 }}>
+                  <a href="/forgot-password" onClick={(e) => {
+                    e.preventDefault();
+                    if (isLoading || isRedirecting) return;
+                    setIsRedirecting(true);
+                    router.push("/forgot-password");
+                  }} style={{ color: "var(--primary-color)", fontSize: "13px", fontWeight: "600", textDecoration: "none", pointerEvents: (isLoading || isRedirecting) ? "none" : "auto", opacity: (isLoading || isRedirecting) ? 0.5 : 1, cursor: (isLoading || isRedirecting) ? "not-allowed" : "pointer" }}>
                     Forgot Password?
-                  </Link>
+                  </a>
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={isLoading}>
+                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: (isLoading || isRedirecting) ? 0.7 : 1, cursor: (isLoading || isRedirecting) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={isLoading || isRedirecting}>
                   {isLoading ? (
                     <>
                       <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
                       Signing In...
+                    </>
+                  ) : isRedirecting ? (
+                    <>
+                      <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span>
+                      Redirecting...
                     </>
                   ) : "Sign In"}
                 </button>

@@ -15,6 +15,18 @@ export default function ForgotPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Handle Resend Timer
+  useEffect(() => {
+    let timer;
+    if (resendTimer > 0) {
+      timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendTimer]);
 
   const otpInputsRef = useRef([]);
 
@@ -25,16 +37,37 @@ export default function ForgotPasswordPage() {
     }
   }, [step]);
 
-  // Step 1: Send simulated OTP
-  const handleRequestOtp = (e) => {
+  // Step 1: Send OTP
+  const handleRequestOtp = async (e) => {
     e.preventDefault();
     if (!email) {
       setError("Please enter your email address.");
       return;
     }
     setError("");
-    // Simulate API call and proceed to step 2
-    setStep(2);
+    setIsLoading(true);
+    
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/forgot-password/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.message || "Failed to process request.");
+        return;
+      }
+      
+      setSuccess(data.message || "If an account exists, an OTP has been sent.");
+      setStep(2);
+      setResendTimer(30); // 30s before they can resend
+    } catch (err) {
+      setError("Unable to connect to the backend server.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Step 2: Handle individual digit input updates
@@ -69,7 +102,7 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const handleVerifyOtp = (e) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
     const enteredCode = otp.join("");
     if (enteredCode.length < 6) {
@@ -77,12 +110,32 @@ export default function ForgotPasswordPage() {
       return;
     }
     setError("");
-    // Simulate verification (any 6 digits works for mockup) and proceed to step 3
-    setStep(3);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/forgot-password/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: enteredCode })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.message || "Invalid verification code.");
+        return;
+      }
+      
+      setSuccess("");
+      setStep(3);
+    } catch (err) {
+      setError("Unable to connect to the backend server.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Step 3: Handle setting new password
-  const handleResetPassword = (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
       setError("Please fill in all password fields.");
@@ -92,13 +145,77 @@ export default function ForgotPasswordPage() {
       setError("Passwords do not match. Please verify.");
       return;
     }
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      setError("Password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      setError("Password must contain at least one lowercase letter.");
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setError("Password must contain at least one number.");
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(newPassword)) {
+      setError("Password must contain at least one special character.");
       return;
     }
     setError("");
-    // Simulate update success
-    setStep(4);
+    setIsLoading(true);
+
+    try {
+      const enteredCode = otp.join("");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/forgot-password/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: enteredCode, newPassword })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.message || "Failed to reset password.");
+        return;
+      }
+      
+      setSuccess("Your password has been reset successfully. You can now log in.");
+      setStep(4);
+    } catch (err) {
+      setError("Unable to connect to the backend server.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async (e) => {
+    e.preventDefault();
+    setIsResending(true);
+    setError("");
+    setSuccess("");
+    
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/forgot-password/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        setSuccess(data.message || "OTP resent successfully.");
+        setResendTimer(60);
+      } else {
+        setError(data.message || "Failed to resend OTP.");
+      }
+    } catch (err) {
+      setError("Unable to connect to server.");
+    } finally {
+      setIsResending(false);
+    }
   };
 
   return (
@@ -158,8 +275,8 @@ export default function ForgotPasswordPage() {
                   />
                 </div>
 
-                <button type="submit" className="btn btn-primary login-btn">
-                  Send OTP Code
+                <button type="submit" className="btn btn-primary login-btn" disabled={isLoading} style={{ opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}>
+                  {isLoading ? "Sending..." : "Send OTP Code"}
                 </button>
 
                 <Link href="/login" className="btn btn-secondary login-btn" style={{ textDecoration: "none", marginTop: "12px" }}>
@@ -173,8 +290,25 @@ export default function ForgotPasswordPage() {
             <div>
               <div className="login-header">
                 <h2>Verify OTP</h2>
-                <p>We sent a 6-digit verification code to <br /><strong>{email}</strong></p>
+                <p style={{ marginBottom: "8px" }}>We sent a 6-digit verification code to <br /><strong>{email}</strong></p>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setStep(1);
+                    setSuccess("");
+                    setError("");
+                  }} 
+                  style={{ background: "none", border: "none", color: "var(--primary-color)", fontSize: "13px", fontWeight: "600", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                >
+                  Edit email address
+                </button>
               </div>
+
+              {success && (
+                <div style={{ padding: "12px", backgroundColor: "var(--primary-light)", color: "var(--primary-color)", borderRadius: "8px", fontSize: "14px", marginBottom: "20px", fontWeight: "500" }}>
+                  {success}
+                </div>
+              )}
 
               {error && (
                 <div style={{ padding: "12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "8px", fontSize: "14px", marginBottom: "20px", fontWeight: "500" }}>
@@ -200,18 +334,18 @@ export default function ForgotPasswordPage() {
                   ))}
                 </div>
 
-                <button type="submit" className="btn btn-primary login-btn">
-                  Verify Code
+                <button type="submit" className="btn btn-primary login-btn" disabled={isLoading} style={{ opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}>
+                  {isLoading ? "Verifying..." : "Verify Code"}
                 </button>
 
-                <Link href="/login" className="btn btn-secondary login-btn" style={{ textDecoration: "none", marginTop: "12px" }}>
+                <Link href="/login" className="btn btn-secondary login-btn" style={{ textDecoration: "none", marginTop: "12px", pointerEvents: isLoading ? "none" : "auto" }}>
                   Back to Login
                 </Link>
 
                 <div style={{ textAlign: "center", marginTop: "20px", fontSize: "14px", color: "var(--text-muted)" }}>
                   Didn't receive code?{" "}
-                  <a href="#" className="forgot-password-link" onClick={() => { setOtp(["", "", "", "", "", ""]); setError(""); alert("Simulating resending OTP to " + email); }}>
-                    Resend Code
+                  <a href="#" className="forgot-password-link" onClick={handleResendOtp} style={{ pointerEvents: (isResending || resendTimer > 0) ? "none" : "auto", color: (isResending || resendTimer > 0) ? "var(--text-muted)" : "var(--primary-color)", textDecoration: (isResending || resendTimer > 0) ? "none" : "underline" }}>
+                    {isResending ? "Resending..." : resendTimer > 0 ? `Resend Code in ${resendTimer}s` : "Resend Code"}
                   </a>
                 </div>
               </form>
@@ -277,6 +411,30 @@ export default function ForgotPasswordPage() {
                       )}
                     </button>
                   </div>
+                  
+                  {/* Password Requirements Checklist */}
+                  {newPassword && (
+                    <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "var(--surface-color)", border: "1px solid var(--border-color)", borderRadius: "8px" }}>
+                      <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: "600", color: "var(--text-color)" }}>Password must contain:</p>
+                      <ul style={{ margin: 0, padding: 0, listStyle: "none", fontSize: "13px" }}>
+                        <li style={{ color: newPassword.length >= 8 ? "var(--success-color)" : "var(--text-muted)", display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ display: "inline-block", width: "14px" }}>{newPassword.length >= 8 ? '✓' : '○'}</span> At least 8 characters
+                        </li>
+                        <li style={{ color: /[A-Z]/.test(newPassword) ? "var(--success-color)" : "var(--text-muted)", display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ display: "inline-block", width: "14px" }}>{/[A-Z]/.test(newPassword) ? '✓' : '○'}</span> One uppercase letter
+                        </li>
+                        <li style={{ color: /[a-z]/.test(newPassword) ? "var(--success-color)" : "var(--text-muted)", display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ display: "inline-block", width: "14px" }}>{/[a-z]/.test(newPassword) ? '✓' : '○'}</span> One lowercase letter
+                        </li>
+                        <li style={{ color: /[0-9]/.test(newPassword) ? "var(--success-color)" : "var(--text-muted)", display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ display: "inline-block", width: "14px" }}>{/[0-9]/.test(newPassword) ? '✓' : '○'}</span> One number
+                        </li>
+                        <li style={{ color: /[^A-Za-z0-9]/.test(newPassword) ? "var(--success-color)" : "var(--text-muted)", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ display: "inline-block", width: "14px" }}>{/[^A-Za-z0-9]/.test(newPassword) ? '✓' : '○'}</span> One special character
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -326,11 +484,11 @@ export default function ForgotPasswordPage() {
                   </div>
                 </div>
 
-                <button type="submit" className="btn btn-primary login-btn">
-                  Update Password
+                <button type="submit" className="btn btn-primary login-btn" disabled={isLoading} style={{ opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}>
+                  {isLoading ? "Updating..." : "Update Password"}
                 </button>
 
-                <Link href="/login" className="btn btn-secondary login-btn" style={{ textDecoration: "none", marginTop: "12px" }}>
+                <Link href="/login" className="btn btn-secondary login-btn" style={{ textDecoration: "none", marginTop: "12px", pointerEvents: isLoading ? "none" : "auto" }}>
                   Back to Login
                 </Link>
               </form>

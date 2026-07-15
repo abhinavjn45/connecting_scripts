@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
-const { send2FAEmail } = require('../services/emailService');
+const { send2FAEmail, sendForgotPasswordEmail } = require('../services/emailService');
 
 // --- Rate Limiters ---
 
@@ -24,6 +24,15 @@ const otpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many verification attempts. Please request a new code.' }
+});
+
+// Forgot Password Request: max 3 requests per IP per 15 mins
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many reset requests. Please try again later.' }
 });
 
 // Maximum failed login attempts before account lockout
@@ -274,14 +283,159 @@ router.post('/resend-2fa', otpLimiter, async (req, res) => {
 });
 
 // 3. POST /api/auth/logout
-router.post('/logout', (req, res) => {
-  const isProdOrHttps = process.env.NODE_ENV === 'production' || (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.startsWith('https'));
+router.get('/logout', (req, res) => {
   res.clearCookie('token', {
     httpOnly: true,
-    secure: isProdOrHttps,
-    sameSite: isProdOrHttps ? 'none' : 'lax'
+    secure: process.env.NODE_ENV === 'production' || (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.startsWith('https')),
+    sameSite: process.env.NODE_ENV === 'production' || (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.startsWith('https')) ? 'none' : 'lax'
   });
   return res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// ==========================================
+// Forgot Password Flow
+// ==========================================
+
+// 1. POST /api/auth/forgot-password/request
+router.post('/forgot-password/request', forgotPasswordLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required.' });
+  }
+
+  try {
+    const [users] = await db.query(
+      'SELECT id, first_name, status FROM users WHERE (company_email = ? OR personal_email = ?)',
+      [email, email]
+    );
+
+    // Generic success message regardless of outcome to prevent email enumeration
+    const genericMessage = 'If an account with that email exists and is active, a password reset code has been sent.';
+
+    if (!users || users.length === 0 || users[0].status !== 'Active') {
+      // Simulate slight delay to prevent timing attacks
+      await new Promise(r => setTimeout(r, 500));
+      return res.json({ success: true, message: genericMessage });
+    }
+
+    const user = users[0];
+    
+    // Generate 6 digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = await bcrypt.hash(otpCode, 10);
+    // 10 minutes expiry
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Update DB
+    await db.query(
+      'UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?',
+      [hashedOtp, otpExpires, user.id]
+    );
+
+    // Send Email
+    await sendForgotPasswordEmail(email, user.first_name, otpCode);
+
+    return res.json({ success: true, message: genericMessage });
+  } catch (error) {
+    console.error('Forgot Password Request Error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+});
+
+// 2. POST /api/auth/forgot-password/verify
+router.post('/forgot-password/verify', otpLimiter, async (req, res) => {
+  const { email, otp } = req.body;
+  
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, message: 'Email and OTP are required.' });
+  }
+
+  try {
+    const [users] = await db.query(
+      'SELECT id, otp_code, otp_expires_at, failed_login_attempts FROM users WHERE (company_email = ? OR personal_email = ?) AND status = "Active"',
+      [email, email]
+    );
+
+    if (!users || users.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    const user = users[0];
+    if (!user.otp_code || !user.otp_expires_at || user.otp_expires_at < new Date()) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    const isValid = await bcrypt.compare(otp, user.otp_code);
+    if (!isValid) {
+      await db.query('UPDATE users SET failed_login_attempts = failed_login_attempts + 1, last_failed_login_at = NOW() WHERE id = ?', [user.id]);
+      const attemptsNow = (user.failed_login_attempts || 0) + 1;
+      if (attemptsNow >= MAX_FAILED_ATTEMPTS) {
+        await db.query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [user.id]);
+        return res.status(401).json({ success: false, message: `Too many failed attempts. Your reset code has been invalidated for security.` });
+      }
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    // Success (Do NOT clear OTP yet, need it for the final reset step)
+    return res.json({ success: true, message: 'OTP verified successfully.' });
+  } catch (error) {
+    console.error('Forgot Password Verify Error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+});
+
+// 3. POST /api/auth/forgot-password/reset
+router.post('/forgot-password/reset', otpLimiter, async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required.' });
+  }
+
+  if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long and contain an uppercase letter, lowercase letter, number, and special character.' });
+  }
+
+  try {
+    const [users] = await db.query(
+      'SELECT id, otp_code, otp_expires_at, failed_login_attempts FROM users WHERE (company_email = ? OR personal_email = ?) AND status = "Active"',
+      [email, email]
+    );
+
+    if (!users || users.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    const user = users[0];
+    if (!user.otp_code || !user.otp_expires_at || user.otp_expires_at < new Date()) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    const isValid = await bcrypt.compare(otp, user.otp_code);
+    if (!isValid) {
+      await db.query('UPDATE users SET failed_login_attempts = failed_login_attempts + 1, last_failed_login_at = NOW() WHERE id = ?', [user.id]);
+      const attemptsNow = (user.failed_login_attempts || 0) + 1;
+      if (attemptsNow >= MAX_FAILED_ATTEMPTS) {
+        await db.query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [user.id]);
+        return res.status(401).json({ success: false, message: `Too many failed attempts. Your reset code has been invalidated for security.` });
+      }
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    // Valid OTP, process password reset
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password, clear OTP, and reset failed attempts
+    await db.query(
+      'UPDATE users SET password = ?, otp_code = NULL, otp_expires_at = NULL, failed_login_attempts = 0 WHERE id = ?',
+      [hashedPassword, user.id]
+    );
+
+    return res.json({ success: true, message: 'Password has been reset successfully.' });
+  } catch (error) {
+    console.error('Forgot Password Reset Error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
 });
 
 module.exports = router;

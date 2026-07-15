@@ -78,22 +78,19 @@ export default function BlogsPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <h2 style={{ fontSize: "16px", color: "var(--text-muted)" }}>{blogs.length} articles found</h2>
         
-        {/* Disable button visually if create permission is disabled */}
-        <button 
-          className="btn btn-primary" 
-          onClick={() => {
-            if (triggerActionCheck("create")) {
-              setIsModalOpen(true);
-            }
-          }}
-          style={{ opacity: crudPermissions.create ? 1 : 0.6 }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add New Blog
-        </button>
+        {/* Hide button completely if create permission is disabled */}
+        {crudPermissions.create && (
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setIsModalOpen(true)}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add New Blog
+          </button>
+        )}
       </div>
 
       <div className="widget">
@@ -105,7 +102,7 @@ export default function BlogsPage() {
                 <th>Author</th>
                 <th>Published Date</th>
                 <th>Views</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
+                {(crudPermissions.update || crudPermissions.delete) && <th style={{ textAlign: "right" }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -115,22 +112,28 @@ export default function BlogsPage() {
                   <td>{blog.author}</td>
                   <td>{blog.date}</td>
                   <td>{blog.views}</td>
-                  <td style={{ textAlign: "right" }}>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ padding: "6px 12px", fontSize: "12px", marginRight: "8px", opacity: crudPermissions.update ? 1 : 0.6 }}
-                      onClick={() => handleEditBlog(blog.title)}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ padding: "6px 12px", fontSize: "12px", color: "var(--danger-color)", opacity: crudPermissions.delete ? 1 : 0.6 }} 
-                      onClick={() => handleDelete(blog.id)}
-                    >
-                      Delete
-                    </button>
+                  {(crudPermissions.update || crudPermissions.delete) && (
+                    <td style={{ textAlign: "right" }}>
+                    {crudPermissions.update && (
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: "6px 12px", fontSize: "12px", marginRight: "8px" }}
+                        onClick={() => handleEditBlog(blog.title)}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {crudPermissions.delete && (
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: "6px 12px", fontSize: "12px", color: "var(--danger-color)" }} 
+                        onClick={() => handleDelete(blog.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
+                  )}
                 </tr>
               ))}
             </tbody>
