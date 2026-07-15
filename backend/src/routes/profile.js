@@ -250,11 +250,12 @@ router.post('/2fa/request', verifyToken, tfaRequestLimiter, async (req, res) => 
     
     // Generate a secure 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
     
-    // Save to database, expires in 10 minutes
+    // Save to database
     await db.query(
-      'UPDATE users SET otp_code = ?, otp_expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE id = ?', 
-      [otpCode, userId]
+      'UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', 
+      [otpCode, otpExpires, userId]
     );
 
     // Send the email in the background (fire-and-forget for instant UI response)
