@@ -110,3 +110,42 @@ INSERT INTO `users` (
 -- Grant Example Admin User full CRUD permissions on all modules
 INSERT INTO `user_module_permissions` (`user_id`, `module_key`, `can_read`, `can_create`, `can_update`, `can_delete`) 
 SELECT 1, module_key, 1, 1, 1, 1 FROM `modules`;
+
+-- ==========================================
+-- PASSWORD MANAGER (VAULT) SETUP
+-- ==========================================
+
+CREATE TABLE IF NOT EXISTS `vault_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(255) NOT NULL,
+  `url` VARCHAR(255) NULL,
+  `username` VARCHAR(255) NULL,
+  `auth_type` ENUM('password', 'oauth') NOT NULL DEFAULT 'password',
+  `oauth_provider` VARCHAR(50) NULL,
+  `encrypted_password` TEXT NULL,
+  `iv` VARCHAR(255) NULL,
+  `auth_tag` VARCHAR(255) NULL,
+  `notes` TEXT NULL,
+  `added_by` INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`added_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `vault_item_access` (
+  `item_id` INT NOT NULL,
+  `user_id` INT NOT NULL,
+  PRIMARY KEY (`item_id`, `user_id`),
+  FOREIGN KEY (`item_id`) REFERENCES `vault_items`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `vault_audit_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `item_id` INT NOT NULL,
+  `action` ENUM('viewed_password', 'copied_password', 'edited', 'created') NOT NULL,
+  `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`item_id`) REFERENCES `vault_items`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

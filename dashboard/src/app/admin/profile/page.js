@@ -106,15 +106,22 @@ function ProfileContent() {
 
   const [showTfaConfirmModal, setShowTfaConfirmModal] = useState(false);
   const [showTfaDisableConfirmModal, setShowTfaDisableConfirmModal] = useState(false);
+  const [showDisableOtpModal, setShowDisableOtpModal] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [tfaLoading, setTfaLoading] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
+  const [otpCode, setOtpCode] = useState(["", "", "", "", "", ""]);
+  const otpRefs = useRef([]);
   const [otpPhase, setOtpPhase] = useState("idle");
   const [otpMsg, setOtpMsg] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
   const [resendAttempts, setResendAttempts] = useState(0);
   const [isResending, setIsResending] = useState(false);
   const [resendDots, setResendDots] = useState("");
+  // Disable 2FA OTP state
+  const [disableOtpCode, setDisableOtpCode] = useState(["", "", "", "", "", ""]);
+  const disableOtpRefs = useRef([]);
+  const [disableOtpPhase, setDisableOtpPhase] = useState("idle");
+  const [disableOtpMsg, setDisableOtpMsg] = useState("");
 
   useEffect(() => {
     let interval;
@@ -513,28 +520,94 @@ function ProfileContent() {
     if (val) {
       setShowTfaConfirmModal(true);
     } else {
+      // Always reset disable OTP state before opening so stale messages don't show
+      setDisableOtpMsg("");
+      setDisableOtpPhase("idle");
+      setDisableOtpCode(["", "", "", "", "", ""]);
       setShowTfaDisableConfirmModal(true);
     }
   };
 
-  const handleTfaDisable = async () => {
+  // Step 1: Send OTP to initiate 2FA disable
+  const requestDisableOtp = async () => {
     setTfaLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/tfa`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ twoFactorEnabled: false })
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/2fa/disable/request`, {
+        method: "POST",
+        credentials: "include"
       });
-      if(res.ok) {
-        setTfaEnabled(false);
-        localStorage.setItem("cs_2fa_enabled", "false");
+      const data = await res.json();
+      if (data.success) {
         setShowTfaDisableConfirmModal(false);
+        setDisableOtpCode(["", "", "", "", "", ""]);
+        setDisableOtpPhase("idle");
+        setDisableOtpMsg("");
+        setShowDisableOtpModal(true);
+      } else {
+        setDisableOtpMsg(data.message || "Failed to send confirmation code.");
       }
-    } catch(err) {
+    } catch (err) {
       console.error(err);
+      setDisableOtpMsg("Connection error. Please try again.");
     } finally {
       setTfaLoading(false);
+    }
+  };
+
+  // Step 2: Verify OTP and confirm 2FA disable
+  const verifyDisableOtp = async () => {
+    const submitted = disableOtpCode.join("");
+    if (submitted.length !== 6) {
+      setDisableOtpPhase("error");
+      setDisableOtpMsg("Please enter the 6-digit code.");
+      return;
+    }
+    setDisableOtpPhase("loading");
+    setDisableOtpMsg("");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/2fa/disable/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ otpCode: submitted })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDisableOtpPhase("success");
+        setDisableOtpMsg("2FA successfully disabled!");
+        setTimeout(() => {
+          setTfaEnabled(false);
+          localStorage.setItem("cs_2fa_enabled", "false");
+          setShowDisableOtpModal(false);
+        }, 1500);
+      } else {
+        setDisableOtpPhase("error");
+        setDisableOtpMsg(data.message || "Invalid code.");
+      }
+    } catch (err) {
+      setDisableOtpPhase("error");
+      setDisableOtpMsg("Connection error. Please try again.");
+    }
+  };
+
+  const handleDisableOtpChange = (e, index) => {
+    const val = e.target.value;
+    const newOtp = [...disableOtpCode];
+    newOtp[index] = val ? val.slice(-1) : "";
+    setDisableOtpCode(newOtp);
+    if (val && index < 5 && disableOtpRefs.current[index + 1]) {
+      disableOtpRefs.current[index + 1].focus();
+    }
+  };
+
+  const handleDisableOtpKeyDown = (e, index) => {
+    if (e.key === "Backspace") {
+      if (!disableOtpCode[index] && index > 0) {
+        const newOtp = [...disableOtpCode];
+        newOtp[index - 1] = "";
+        setDisableOtpCode(newOtp);
+        disableOtpRefs.current[index - 1].focus();
+      }
     }
   };
 
@@ -552,7 +625,7 @@ function ProfileContent() {
         setShowOtpModal(true);
         setOtpPhase("idle");
         setOtpMsg("");
-        setOtpCode("");
+        setOtpCode(["", "", "", "", "", ""]);
         if (!isResend) {
           setResendAttempts(1);
           setResendTimer(30);
@@ -571,7 +644,8 @@ function ProfileContent() {
   };
 
   const verifyTfaOtp = async () => {
-    if (otpCode.length !== 6) {
+    const submittedOtp = otpCode.join("");
+    if (submittedOtp.length !== 6) {
       setOtpPhase("error");
       setOtpMsg("Please enter a 6-digit code");
       return;
@@ -583,7 +657,7 @@ function ProfileContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ otpCode })
+        body: JSON.stringify({ otpCode: submittedOtp })
       });
       const data = await res.json();
       if (data.success) {
@@ -604,6 +678,26 @@ function ProfileContent() {
     }
   };
 
+  const handleOtpChange = (e, index) => {
+    const val = e.target.value;
+    const newOtp = [...otpCode];
+    newOtp[index] = val ? val.slice(-1) : "";
+    setOtpCode(newOtp);
+    if (val && index < 5 && otpRefs.current[index + 1]) {
+      otpRefs.current[index + 1].focus();
+    }
+  };
+
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === "Backspace") {
+      if (!otpCode[index] && index > 0) {
+        const newOtp = [...otpCode];
+        newOtp[index - 1] = "";
+        setOtpCode(newOtp);
+        otpRefs.current[index - 1].focus();
+      }
+    }
+  };
 
   const handleRevokeSession = (id) => {
     setSessionList(sessionList.filter((s) => s.id !== id));
@@ -2100,19 +2194,104 @@ function ProfileContent() {
             zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
             animation: "fadeIn 0.2s ease-out"
           }}>
-            <div className="card" style={{ width: "380px", padding: "28px", borderRadius: "16px", textAlign: "center" }}>
+            <div className="card" style={{ width: "400px", padding: "28px", borderRadius: "16px", textAlign: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--danger-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
               <h3 style={{ margin: "0 0 12px 0", fontSize: "17px", fontWeight: "700" }}>Disable Two-Factor Authentication?</h3>
               <p style={{ margin: "0 0 24px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.6" }}>
-                Are you sure you want to disable 2FA? This will remove the extra layer of security from your account.
+                This will remove the extra layer of security from your account. A confirmation code will be sent to your registered email to authorize this action.
               </p>
+              {disableOtpMsg && !showDisableOtpModal && (
+                <p style={{ fontSize: "13px", color: "var(--danger-color)", marginBottom: "16px" }}>{disableOtpMsg}</p>
+              )}
               <div style={{ display: "flex", gap: "12px" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTfaDisableConfirmModal(false)} style={{ flex: 1, padding: "12px" }} disabled={tfaLoading}>
                   Cancel
                 </button>
-                <button type="button" onClick={() => handleTfaDisable()} disabled={tfaLoading} className="btn btn-primary" style={{ flex: 1, padding: "12px", backgroundColor: "var(--danger-color)", borderColor: "var(--danger-color)", color: "white", opacity: tfaLoading ? 0.7 : 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                <button type="button" onClick={requestDisableOtp} disabled={tfaLoading} className="btn btn-primary" style={{ flex: 1, padding: "12px", backgroundColor: "var(--danger-color)", borderColor: "var(--danger-color)", color: "white", opacity: tfaLoading ? 0.7 : 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
                   {tfaLoading ? (
-                    <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Disabling...</>
-                  ) : "Disable 2FA"}
+                    <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Sending Code...</>
+                  ) : "Send Confirmation Code"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2FA Disable OTP Verification Modal */}
+        {showDisableOtpModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            backgroundColor: "rgba(8, 17, 32, 0.8)", backdropFilter: "blur(4px)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease-out"
+          }}>
+            <div className="card" style={{ width: "380px", padding: "28px", borderRadius: "16px", textAlign: "center" }}>
+              <h3 style={{ margin: "0 0 12px 0", fontSize: "17px", fontWeight: "700" }}>Confirm 2FA Disable</h3>
+              <p style={{ margin: "0 0 24px 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.6" }}>
+                Enter the 6-digit code sent to your registered email to confirm disabling 2FA.
+              </p>
+
+              <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "16px" }}>
+                {disableOtpCode.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => (disableOtpRefs.current[index] = el)}
+                    type="text"
+                    value={digit}
+                    onChange={(e) => handleDisableOtpChange(e, index)}
+                    onKeyDown={(e) => handleDisableOtpKeyDown(e, index)}
+                    disabled={disableOtpPhase === "loading" || disableOtpPhase === "success"}
+                    className="form-input"
+                    style={{
+                      width: "45px", height: "50px", textAlign: "center", fontSize: "20px",
+                      fontWeight: "bold", padding: 0, borderRadius: "8px", border: "1px solid var(--border-color)",
+                      backgroundColor: "var(--bg-color)", color: "var(--text-color)"
+                    }}
+                  />
+                ))}
+              </div>
+
+              {disableOtpMsg && (
+                <div style={{ marginBottom: "16px", fontSize: "13px", fontWeight: "600", color: disableOtpPhase === "error" ? "var(--danger-color)" : "var(--success-color)" }}>
+                  {disableOtpMsg}
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={verifyDisableOtp}
+                disabled={disableOtpCode.join("").length !== 6 || disableOtpPhase === "loading" || disableOtpPhase === "success"}
+                style={{ width: "100%", padding: "12px", marginBottom: "12px", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "var(--danger-color)", borderColor: "var(--danger-color)" }}
+              >
+                {disableOtpPhase === "loading" ? (
+                  <><span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite", marginRight: "8px" }}></span> Verifying...</>
+                ) : disableOtpPhase === "success" ? "Verified" : "Verify & Disable"}
+              </button>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px" }}>
+                <button type="button" className="btn" onClick={() => {
+                    setShowDisableOtpModal(false);
+                    setDisableOtpPhase("idle");
+                    setDisableOtpMsg("");
+                    setDisableOtpCode(["", "", "", "", "", ""]);
+                  }} style={{ fontSize: "13px", padding: 0, background: "none", border: "none", color: "var(--text-muted)" }}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={requestDisableOtp}
+                  disabled={tfaLoading || disableOtpPhase === "loading" || disableOtpPhase === "success"}
+                  style={{ fontSize: "13px", padding: 0, background: "none", border: "none", color: (tfaLoading || disableOtpPhase === "loading" || disableOtpPhase === "success") ? "var(--text-muted)" : "var(--primary-color)", fontWeight: "600" }}
+                >
+                  {tfaLoading ? "Resending..." : "Resend Code"}
                 </button>
               </div>
             </div>
@@ -2133,19 +2312,25 @@ function ProfileContent() {
                 Please enter the 6-digit code sent to your email. It expires in 10 minutes.
               </p>
               
-              <input 
-                type="text" 
-                maxLength="6" 
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="------"
-                style={{
-                  width: "100%", padding: "12px", fontSize: "24px", letterSpacing: "8px", 
-                  textAlign: "center", borderRadius: "8px", border: "1px solid var(--border-color)",
-                  marginBottom: "16px", background: "var(--bg-color)", color: "var(--text-color)"
-                }}
-                disabled={otpPhase === "loading" || otpPhase === "success"}
-              />
+              <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "16px" }}>
+                {otpCode.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => (otpRefs.current[index] = el)}
+                    type="text"
+                    value={digit}
+                    onChange={(e) => handleOtpChange(e, index)}
+                    onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                    disabled={otpPhase === "loading" || otpPhase === "success"}
+                    className="form-input"
+                    style={{
+                      width: "45px", height: "50px", textAlign: "center", fontSize: "20px",
+                      fontWeight: "bold", padding: 0, borderRadius: "8px", border: "1px solid var(--border-color)",
+                      backgroundColor: "var(--bg-color)", color: "var(--text-color)"
+                    }}
+                  />
+                ))}
+              </div>
 
               {otpMsg && (
                 <div style={{ marginBottom: "16px", fontSize: "13px", fontWeight: "600", color: otpPhase === "error" ? "var(--danger-color)" : "var(--success-color)" }}>
@@ -2157,7 +2342,7 @@ function ProfileContent() {
                 type="button" 
                 className="btn btn-primary"
                 onClick={verifyTfaOtp} 
-                disabled={otpCode.length !== 6 || otpPhase === "loading" || otpPhase === "success"}
+                disabled={otpCode.join("").length !== 6 || otpPhase === "loading" || otpPhase === "success"}
                 style={{ width: "100%", padding: "12px", marginBottom: "12px", display: "flex", justifyContent: "center", alignItems: "center" }}
               >
                 {otpPhase === "loading" ? (

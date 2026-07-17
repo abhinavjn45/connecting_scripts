@@ -310,6 +310,15 @@ router.delete('/:id', verifyToken, requirePermission('users', 'delete'), async (
   }
 
   try {
+    // Privilege Escalation check: Prevent deleting Super Admins
+    const [targetUserRows] = await db.query('SELECT role FROM users WHERE id = ?', [id]);
+    if (targetUserRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+    if (targetUserRows[0].role === 'Super Admin') {
+      return res.status(403).json({ success: false, message: 'Super Admin accounts cannot be deleted.' });
+    }
+
     const [result] = await db.query('DELETE FROM users WHERE id = ?', [id]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'User not found.' });

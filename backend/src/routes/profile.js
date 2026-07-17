@@ -4,6 +4,7 @@ const db = require('../config/db');
 const verifyToken = require('../middleware/auth');
 const cloudinary = require('../config/cloudinary');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 
 // --- Rate Limiters ---
@@ -86,6 +87,7 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // Helper to extract Cloudinary public_id from resource URL
+// Returns null if the public_id does NOT belong to the 'user_avatars' folder (security guard)
 function getPublicIdFromUrl(url) {
   if (!url || !url.includes('res.cloudinary.com')) return null;
   const parts = url.split('/upload/');
@@ -105,6 +107,10 @@ function getPublicIdFromUrl(url) {
   if (dotIndex !== -1) {
     path = path.substring(0, dotIndex);
   }
+
+  // Security Guard: only allow deletion from the 'user_avatars' folder
+  if (!path.startsWith('user_avatars/')) return null;
+
   return path;
 }
 
@@ -117,21 +123,22 @@ router.put('/avatar', verifyToken, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Avatar image URL is required.' });
   }
 
-  try {
-    // 1. Fetch current profile image to delete from Cloudinary
-    const [users] = await db.query('SELECT profile_image FROM users WHERE id = ?', [userId]);
-    if (users.length > 0 && users[0].profile_image) {
-      const oldImage = users[0].profile_image;
-      const publicId = getPublicIdFromUrl(oldImage);
-      if (publicId) {
-        console.log(`[Cloudinary Cleanup]: Deleting old avatar with public ID: ${publicId}`);
-        await cloudinary.uploader.destroy(publicId);
-      }
-    }
+  // Security: Strictly validate that the incoming URL is from our own Cloudinary account
+  // and belongs to the user_avatars folder to prevent IDOR via URL manipulation.
+  const expectedPublicId = `user_avatars/user_${userId}`;
+  const parsedPublicId = getPublicIdFromUrl(avatarUrl);
+  if (!parsedPublicId || parsedPublicId !== expectedPublicId) {
+    return res.status(400).json({ success: false, message: 'Invalid avatar URL. Must be a valid uploaded avatar from this application.' });
+  }
 
-    // 2. Save new avatar URL to MySQL
+  try {
+    // Old avatar cleanup: Since we use overwrite: true with a deterministic public_id
+    // (user_avatars/user_<userId>), Cloudinary automatically replaces the old asset.
+    // No manual deletion needed, which eliminates the IDOR attack surface entirely.
+
+    // Save new avatar URL to MySQL
     await db.query('UPDATE users SET profile_image = ? WHERE id = ?', [avatarUrl, userId]);
-    return res.json({ success: true, message: 'Profile avatar image successfully saved in database and old cloud asset purged.' });
+    return res.json({ success: true, message: 'Profile avatar image successfully saved in database.' });
   } catch (error) {
     console.error('Error updating avatar path:', error);
     return res.status(500).json({ success: false, message: 'Failed to update avatar image path.' });
@@ -218,22 +225,13 @@ router.put('/', verifyToken, async (req, res) => {
   }
 });
 
-// 3. PUT /api/profile/tfa (Used for disabling 2FA)
+// 3. PUT /api/profile/tfa (Legacy - kept for reference, now superseded by /2fa/disable flow)
+// Direct disable is blocked — user must go through OTP verification
 router.put('/tfa', verifyToken, async (req, res) => {
-  const userId = req.user.userId;
-  const { twoFactorEnabled } = req.body;
-
-  if (twoFactorEnabled) {
-    return res.status(400).json({ success: false, message: 'Please use the OTP verification flow to enable 2FA.' });
-  }
-
-  try {
-    await db.query('UPDATE users SET two_factor_enabled = 0, otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userId]);
-    return res.json({ success: true, message: 'Two-Factor Authentication disabled successfully.' });
-  } catch (error) {
-    console.error('Error disabling 2FA:', error);
-    return res.status(500).json({ success: false, message: 'Failed to update 2FA status.' });
-  }
+  return res.status(400).json({
+    success: false,
+    message: 'Please use the secure OTP verification flow to disable 2FA.'
+  });
 });
 
 const { send2FAEmail } = require('../services/emailService');
@@ -248,8 +246,8 @@ router.post('/2fa/request', verifyToken, tfaRequestLimiter, async (req, res) => 
 
     const user = users[0];
     
-    // Generate a secure 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate secure 6-digit OTP
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
     
     // Hash the OTP before saving it to the database
@@ -263,7 +261,7 @@ router.post('/2fa/request', verifyToken, tfaRequestLimiter, async (req, res) => 
 
     // Send the email in the background (fire-and-forget for instant UI response)
     const targetEmail = user.personal_email || user.company_email;
-    send2FAEmail(targetEmail, user.first_name, otpCode).catch(err => {
+    send2FAEmail(targetEmail, user.first_name, otpCode, 'enable').catch(err => {
       console.error("Background 2FA Email failed:", err);
     });
 
@@ -309,6 +307,81 @@ router.post('/2fa/verify', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error verifying 2FA OTP:', error);
     return res.status(500).json({ success: false, message: 'Failed to verify OTP.' });
+  }
+});
+
+// 3c. POST /api/profile/2fa/disable/request — Send OTP to confirm 2FA disable
+router.post('/2fa/disable/request', verifyToken, tfaRequestLimiter, async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const [users] = await db.query('SELECT first_name, company_email, personal_email, two_factor_enabled FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const user = users[0];
+    if (!user.two_factor_enabled) {
+      return res.status(400).json({ success: false, message: '2FA is not currently enabled on your account.' });
+    }
+
+    // Generate secure 6-digit OTP
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    const hashedOtp = await bcrypt.hash(otpCode, 8);
+    await db.query('UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', [hashedOtp, otpExpires, userId]);
+
+    const targetEmail = user.personal_email || user.company_email;
+    send2FAEmail(targetEmail, user.first_name, otpCode, 'disable').catch(err => {
+      console.error('Background 2FA Disable Email failed:', err);
+    });
+
+    return res.json({ success: true, message: 'A confirmation code has been sent to your registered email.' });
+  } catch (error) {
+    console.error('Error requesting 2FA disable OTP:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send confirmation OTP.' });
+  }
+});
+
+// 3d. POST /api/profile/2fa/disable/verify — Verify OTP and disable 2FA
+router.post('/2fa/disable/verify', verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { otpCode } = req.body;
+
+  if (!otpCode || otpCode.length !== 6) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid 6-digit code.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT otp_code, otp_expires_at, two_factor_enabled FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const user = users[0];
+
+    if (!user.two_factor_enabled) {
+      return res.status(400).json({ success: false, message: '2FA is not currently enabled on your account.' });
+    }
+
+    if (!user.otp_code) {
+      return res.status(400).json({ success: false, message: 'No active confirmation code found. Please request a new one.' });
+    }
+
+    if (new Date() > new Date(user.otp_expires_at)) {
+      await db.query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userId]);
+      return res.status(400).json({ success: false, message: 'Code has expired. Please request a new one.' });
+    }
+
+    const isValid = await bcrypt.compare(otpCode, user.otp_code);
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: 'Invalid confirmation code.' });
+    }
+
+    // OTP confirmed — disable 2FA and clear OTP fields
+    await db.query('UPDATE users SET two_factor_enabled = 0, otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userId]);
+
+    return res.json({ success: true, message: 'Two-Factor Authentication has been successfully disabled.' });
+  } catch (error) {
+    console.error('Error verifying 2FA disable OTP:', error);
+    return res.status(500).json({ success: false, message: 'Failed to disable 2FA.' });
   }
 });
 

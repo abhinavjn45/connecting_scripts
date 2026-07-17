@@ -75,11 +75,13 @@ const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const assetRoutes = require('./routes/assets');
 const usersRoutes = require('./routes/users');
+const vaultRoutes = require('./routes/vault');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/vault', vaultRoutes);
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {

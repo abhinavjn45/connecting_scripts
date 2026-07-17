@@ -81,6 +81,7 @@ export default function AdminLayout({ children, title }) {
           setPermissions(data.permissions || {});
 
           // Keep local cache in sync
+          localStorage.setItem("cs_user_id", data.user.id);
           localStorage.setItem("cs_rbac_role", data.user.role);
           localStorage.setItem("cs_rbac_permissions", JSON.stringify(data.permissions));
         }

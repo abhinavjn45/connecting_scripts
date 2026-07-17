@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const db = require('../config/db');
 const { send2FAEmail, sendForgotPasswordEmail } = require('../services/emailService');
@@ -116,8 +117,8 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     // Check Multi-Factor status (2FA)
     if (user.two_factor_enabled === 1) {
-      // Generate a secure 6-digit random code
-      const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+      // Generate 6-digit OTP
+      const otpCode = crypto.randomInt(100000, 1000000).toString();
       const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
 
       // Hash the OTP before storing — a plain-text OTP in the DB is a security risk
@@ -127,7 +128,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
       // Dispatch the email asynchronously so the UI updates instantly
       const targetEmail = user.personal_email || user.company_email;
-      send2FAEmail(targetEmail, user.first_name, otpCode).catch(err => {
+      send2FAEmail(targetEmail, user.first_name, otpCode, 'login').catch(err => {
         console.error("Login 2FA Email failed:", err);
       });
       return res.json({
@@ -263,15 +264,15 @@ router.post('/resend-2fa', otpLimiter, async (req, res) => {
     if (user.two_factor_enabled !== 1) {
       return res.status(400).json({ success: false, message: '2FA is not enabled for this account.' });
     }
-
-    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    // Generate 6-digit OTP
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000); 
 
     const hashedOtp = await bcrypt.hash(otpCode, 8);
     await db.query('UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', [hashedOtp, otpExpires, user.id]);
 
     const targetEmail = user.personal_email || user.company_email;
-    send2FAEmail(targetEmail, user.first_name, otpCode).catch(err => {
+    send2FAEmail(targetEmail, user.first_name, otpCode, 'login').catch(err => {
       console.error("Login Resend 2FA Email failed:", err);
     });
 
@@ -321,7 +322,7 @@ router.post('/forgot-password/request', forgotPasswordLimiter, async (req, res) 
     const user = users[0];
     
     // Generate 6 digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     // 10 minutes expiry
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);

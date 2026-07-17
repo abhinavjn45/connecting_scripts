@@ -61,6 +61,55 @@ async function initializeDatabase() {
         console.log('Migration: expanded otp_code column to VARCHAR(255) to support bcrypt hashes.');
       }
 
+      // Ensure vault_items table exists
+      const [vaultCheck] = await db.query(`
+        SELECT COUNT(*) as count 
+        FROM information_schema.tables 
+        WHERE table_schema = ? AND table_name = 'vault_items'
+      `, [process.env.DB_NAME]);
+      
+      if (vaultCheck[0].count === 0) {
+        console.log('Migration: Creating Password Manager (Vault) tables...');
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS \`vault_items\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`title\` VARCHAR(255) NOT NULL,
+            \`url\` VARCHAR(255) NULL,
+            \`username\` VARCHAR(255) NULL,
+            \`auth_type\` ENUM('password', 'oauth') NOT NULL DEFAULT 'password',
+            \`oauth_provider\` VARCHAR(50) NULL,
+            \`encrypted_password\` TEXT NULL,
+            \`iv\` VARCHAR(255) NULL,
+            \`auth_tag\` VARCHAR(255) NULL,
+            \`notes\` TEXT NULL,
+            \`added_by\` INT NOT NULL,
+            \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (\`added_by\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS \`vault_item_access\` (
+            \`item_id\` INT NOT NULL,
+            \`user_id\` INT NOT NULL,
+            PRIMARY KEY (\`item_id\`, \`user_id\`),
+            FOREIGN KEY (\`item_id\`) REFERENCES \`vault_items\`(\`id\`) ON DELETE CASCADE,
+            FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS \`vault_audit_logs\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`user_id\` INT NOT NULL,
+            \`item_id\` INT NOT NULL,
+            \`action\` ENUM('viewed_password', 'copied_password', 'edited', 'created') NOT NULL,
+            \`timestamp\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE,
+            FOREIGN KEY (\`item_id\`) REFERENCES \`vault_items\`(\`id\`) ON DELETE CASCADE
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log('Migration: Password Manager tables created successfully.');
+      }
       return;
     }
 
