@@ -165,6 +165,14 @@ export default function PasswordManagerPage() {
     fetchAssignedUsers(item.id);
   };
 
+  const handleResetForm = () => {
+    if (editingItem) {
+      handleEdit(editingItem);
+    } else {
+      handleCreateNew();
+    }
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setModalLoading(true);
@@ -767,6 +775,9 @@ export default function PasswordManagerPage() {
               <div style={{ padding: "16px 28px", borderTop: "1px solid var(--border-color)", backgroundColor: "var(--card-bg)", flexShrink: 0, display: "flex", gap: "12px" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} style={{ flex: 1, justifySelf: "center" }} disabled={modalLoading}>
                   Cancel
+                </button>
+                <button type="button" className="btn btn-outline" onClick={handleResetForm} style={{ flex: 1, display: "flex", justifyContent: "center" }} disabled={modalLoading}>
+                  Reset
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 2, opacity: modalLoading ? 0.7 : 1, cursor: modalLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} disabled={modalLoading}>
                   {modalLoading ? (
