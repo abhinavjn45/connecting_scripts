@@ -16,12 +16,12 @@ export default function Home() {
           <div className="row align-items-center">
             <div className="col-lg-6">
               <div className="header-main-content heading1">
-                <h5><img src="/assets/img/icons/logo-icons.svg" alt="" />Top #1 SEO &amp; Marketing Agency</h5>
-                <h1 className="text-anime-style-3">Elevate Your Brand With Expert SEO &amp; Digital Marketing</h1>
-                <p data-aos="fade-left" data-aos-duration="1000">Welcome to SEOC where we specialize in revolutionizing your online <br className="d-lg-block d-none" /> presence through expert SEO and digital marketing solutions. </p>
+                <h5><img src="/assets/img/icons/logo-icons.svg" alt="" />Full-Service Digital Marketing Partner</h5>
+                <h1 className="text-anime-style-3">Grow Your Brand With Websites, Apps &amp; Digital Marketing</h1>
+                <p data-aos="fade-left" data-aos-duration="1000">Welcome to Connecting Scripts — we build websites, apps and campaigns that turn <br className="d-lg-block d-none" /> your online presence into real, measurable business growth.</p>
                 <div className="btn-area" data-aos="fade-left" data-aos-duration="1200">
-                  <a href="#" className="header-btn1">Start Ranking Now <span><i className="fa-solid fa-arrow-right"></i></span></a>
-                  <a href="#" className="header-btn2">Contact Now <span><i className="fa-solid fa-arrow-right"></i></span></a>
+                  <a href="#" className="header-btn1">Get Free Strategy Call <span><i className="fa-solid fa-arrow-right"></i></span></a>
+                  <a href="#" className="header-btn2">See Our Work <span><i className="fa-solid fa-arrow-right"></i></span></a>
                 </div>
               </div>
             </div>
@@ -60,7 +60,7 @@ export default function Home() {
           <div className="row align-items-center">
             <div className="col-lg-2">
               <div className="sldier-head">
-                <p>Trusted by <br className="d-lg-block d-none" /> Top Companies</p>
+                <p>Trusted by <br className="d-lg-block d-none" /> Growing Brands</p>
               </div>
             </div>
             <div className="col-lg-10">
@@ -108,8 +108,8 @@ export default function Home() {
                       <img src="/assets/img/icons/arrow.svg" alt="" className="arrow" />
                     </Link>
                   </div>
-                  <h2 className="text-anime-style-3">Comprehensive SEO &amp; Digital Marketing Solutions.</h2>
-                  <p data-aos="fade-left" data-aos-duration="1000">Welcome to SEOC your trusted partner for comprehensive SEO and digital marketing solutions. With our proven expertise and innovative strategies the digital landscape.</p>
+                  <h2 className="text-anime-style-3">Full-Stack Digital Marketing Under One Roof.</h2>
+                  <p data-aos="fade-left" data-aos-duration="1000">Welcome to Connecting Scripts, your trusted partner for websites, apps, SEO, ads and design. With 5+ years of proven expertise, we help brands win the digital landscape.</p>
                   <div className="btn-area" data-aos="fade-left" data-aos-duration="1200">
                     <Link href="/about-us" className="header-btn1">Learn More <span><i className="fa-solid fa-arrow-right"></i></span></Link>
                   </div>
@@ -137,7 +137,7 @@ export default function Home() {
                   <img src="/assets/img/elements/star2.png" alt="" className="star2 keyframe5" />
                   <img src="/assets/img/elements/star2.png" alt="" className="star3 keyframe5" />
                   <h2 className="text-anime-style-3">Popular Digital Marketing Services <br className="d-md-block d-none" /> To Build Your Business</h2>
-                  <p data-aos="fade-up" data-aos-duration="1000">Our expert team specializes in delivering tailored solutions designed to elevate <br className="d-md-block d-none" /> your brand and drive measurable results. </p>
+                  <p data-aos="fade-up" data-aos-duration="1000">Our expert team specializes in delivering tailored solutions designed to elevate <br className="d-md-block d-none" /> your brand and drive measurable, trackable results. </p>
                 </div>
               </div>
             </div>
@@ -145,35 +145,35 @@ export default function Home() {
               <div className="col-lg-12">
                 <div className="service-all-boxes-area">
                   <div className="service-boxarea" data-aos="zoom-in" data-aos-duration="800">
-                    <Link href="/services">Search Engine Optimization ( SEO)</Link>
+                    <Link href="/services">Search Engine Optimization (SEO)</Link>
                     <div className="space40"></div>
                     <img src="/assets/img/icons/service-icon1.svg" alt="" />
                     <div className="space40"></div>
-                    <p>Enhance your online visibility &amp; drive organic traffic with our advanced SEO techniques. We optimize your website to rank higher.</p>
+                    <p>Enhance your online visibility &amp; drive organic traffic with our proven SEO techniques. We optimize your site to rank higher, faster.</p>
                   </div>
 
                   <div className="service-boxarea box2" data-aos="zoom-in" data-aos-duration="1000">
-                    <Link href="/services">Pay-Per-Click (PPC) Advertising</Link>
+                    <Link href="/services">Google &amp; Meta Ads Management</Link>
                     <div className="space40"></div>
                     <img src="/assets/img/icons/service-icon2.svg" alt="" />
                     <div className="space40"></div>
-                    <p>Reach your audience instantly and drive qualified leads with targeted PPC campaigns. Our experts craft compelling ad copy and optimize.</p>
+                    <p>Reach your audience instantly and drive qualified leads with targeted Google &amp; Meta ad campaigns built, tracked and optimized by us.</p>
                   </div>
 
                   <div className="service-boxarea box3" data-aos="zoom-in" data-aos-duration="1200">
-                    <Link href="/services">Social Media Marketing</Link>
+                    <Link href="/services">Social Media Management</Link>
                     <div className="space66"></div>
                     <img src="/assets/img/icons/service-icon3.svg" alt="" />
                     <div className="space40"></div>
-                    <p>Build a strong brand presence and engage with your audience on social media platforms. We create strategic social media campaigns to boost brand.</p>
+                    <p>Build a strong brand presence and engage your audience across every platform. We plan, design and post strategic content that grows your brand.</p>
                   </div>
 
                   <div className="service-boxarea box4" data-aos="zoom-in" data-aos-duration="1400">
-                    <Link href="/services">Website Design and Development</Link>
+                    <Link href="/services">Website &amp; App Development</Link>
                     <div className="space40"></div>
                     <img src="/assets/img/icons/service-icon4.svg" alt="" />
                     <div className="space40"></div>
-                    <p>Make a lasting impression with a professionally designed and user-friendly website. Our web design and development services ensure website.</p>
+                    <p>Make a lasting impression with a professionally designed website or app. Our development team ensures your product is fast and reliable.</p>
                   </div>
                 </div>
               </div>
@@ -191,7 +191,7 @@ export default function Home() {
                   <img src="/assets/img/elements/star2.png" alt="" className="star2 keyframe5" />
                   <img src="/assets/img/elements/star2.png" alt="" className="star3 keyframe5" />
                   <h2 className="text-anime-style-3">Tailored Solutions, Proven Results, <br className="d-md-block d-none" /> And Exceptional Service</h2>
-                  <p data-aos="fade-up" data-aos-duration="1000">We pride ourselves on delivering a value proposition that goes beyond expectations. Our <br className="d-md-block d-none" /> approach is centered on understanding your business inside</p>
+                  <p data-aos="fade-up" data-aos-duration="1000">We pride ourselves on delivering a value proposition that goes beyond expectations. Our <br className="d-md-block d-none" /> approach starts with truly understanding your business inside</p>
                 </div>
               </div>
             </div>
@@ -203,8 +203,8 @@ export default function Home() {
                   </div>
                   <div className="content-area">
                     <h5>Our Value</h5>
-                    <Link href="/services" className="text text-anime-style-3">Explore Our Unique Value Proposition &amp; How We Drive Business Growth</Link>
-                    <p data-aos="fade-up" data-aos-duration="1000">we're committed to delivering exceptional value to our clients. We understand that every business is unique, personalized approach to every project we undertake.</p>
+                    <Link href="/services" className="text text-anime-style-3">Explore Our Unique Approach &amp; How We Drive Real Business Growth</Link>
+                    <p data-aos="fade-up" data-aos-duration="1000">we're committed to delivering exceptional value to every client. We know every business is unique, so Connecting Scripts builds a personalized plan for every project we take on.</p>
                     <div className="btn-area" data-aos="fade-up" data-aos-duration="1200">
                       <Link href="/services" className="header-btn1">Learn More <span><i className="fa-solid fa-arrow-right"></i></span></Link>
                     </div>
@@ -224,8 +224,8 @@ export default function Home() {
                         </div>
                         <div className="content-area">
                           <h5>Our Mission</h5>
-                          <Link href="/services">We strive to be more than just a service provider; we aim to be trusted SEOC </Link>
-                          <p>By staying true to our mission and values, we are committed to helping businesses of all sizes achieve their goals, realize their potential shape.</p>
+                          <Link href="/services">We strive to be more than just a vendor; we aim to be your trusted growth partner</Link>
+                          <p>By staying true to our mission and values, we are committed to helping businesses of every size hit their goals and unlock their full potential.</p>
                         </div>
                       </div>
                     </div>
@@ -238,7 +238,7 @@ export default function Home() {
                         <div className="content-area">
                           <h5>Our Vision</h5>
                           <Link href="/services">We aspire to create a world where every business owner feels empowered</Link>
-                          <p>By staying true to our vision and values, we are committed to driving positive change and shaping a brighter future for businesses and communities.</p>
+                          <p>By staying true to our vision and values, we are committed to driving real growth and shaping a brighter digital future for brands and communities.</p>
                         </div>
                       </div>
                     </div>
@@ -258,8 +258,8 @@ export default function Home() {
                 <div className="case-header-area heading2 text-center">
                   <img src="/assets/img/elements/star2.png" alt="" className="star2 keyframe5" />
                   <img src="/assets/img/elements/star2.png" alt="" className="star3 keyframe5" />
-                  <h2 className="text-anime-style-3">Benefits of SEO &amp; Digital Marketing</h2>
-                  <p data-aos="fade-up" data-aos-duration="1000">By investing in strategic SEO and digital marketing initiatives, businesses can <br className="d-md-block d-none" /> unlock a myriad of benefits.</p>
+                  <h2 className="text-anime-style-3">Benefits of Working With a Full-Service Agency</h2>
+                  <p data-aos="fade-up" data-aos-duration="1000">By investing in strategic website, SEO and marketing initiatives, businesses can <br className="d-md-block d-none" /> unlock a wide range of measurable benefits.</p>
                 </div>
               </div>
             </div>
@@ -269,71 +269,71 @@ export default function Home() {
                     <div className="cs_case_study cs_style_1 cs_hover_active active" data-aos="fade-up" data-aos-duration="800">
                       <a href="#" className="cs_case_study_thumb cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img1.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">Website Design &amp; Development</a>
+                        <a href="#">Website &amp; Mobile App Development</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">Website Design &amp; Development </a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Website &amp; Mobile App Development </a>
+                        <p>We build fast, mobile-friendly websites and apps that turn visitors into leads, so your online presence works as hard as your sales team.</p>
                       </div>
                     </div>
                     <div className="cs_case_study cs_style_1 cs_hover_active" data-aos="fade-up" data-aos-duration="900">
                       <a href="#" className="cs_case_study_thumb cs_case_study_thumb2 cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img2.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">SEO</a>
+                        <a href="#">Search Engine Optimization</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">SEO</a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Search Engine Optimization</a>
+                        <p>We understand the critical role that consistent SEO plays in shaping your visibility, helping your business get found before competitors do.</p>
                       </div>
                     </div>
                     <div className="cs_case_study cs_style_1 cs_hover_active" data-aos="fade-up" data-aos-duration="1000">
                       <a href="#" className="cs_case_study_thumb cs_case_study_thumb3 cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img3.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">PPC Advertising</a>
+                        <a href="#">Google &amp; Meta Ads</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">PPC Advertising</a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Google &amp; Meta Ads</a>
+                        <p>We understand the critical role that targeted Google and Meta ad campaigns play in shaping instant visibility and driving qualified leads.</p>
                       </div>
                     </div>
                     <div className="cs_case_study cs_style_1 cs_hover_active" data-aos="fade-up" data-aos-duration="1100">
                       <a href="#" className="cs_case_study_thumb cs_case_study_thumb4 cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img4.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">Social Media Marketing</a>
+                        <a href="#">Social Media Management</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">Social Media Marketing</a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Social Media Management</a>
+                        <p>We understand the critical role that consistent, on-brand social content plays in shaping your community and keeping your audience engaged.</p>
                       </div>
                     </div>
                     <div className="cs_case_study cs_style_1 cs_hover_active" data-aos="fade-up" data-aos-duration="1200">
                       <a href="#" className="cs_case_study_thumb cs_case_study_thumb5 cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img5.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">Content Marketing</a>
+                        <a href="#">Graphic Designing</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">Content Marketing</a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Graphic Designing</a>
+                        <p>We understand the critical role that sharp, on-brand visual design plays in shaping first impressions across your website and social channels.</p>
                       </div>
                     </div>
                     <div className="cs_case_study cs_style_1 cs_hover_active" data-aos="fade-up" data-aos-duration="1300">
                       <a href="#" className="cs_case_study_thumb cs_case_study_thumb6 cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img6.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">Email Marketing</a>
+                        <a href="#">Video Editing</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">Email Marketing</a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Video Editing</a>
+                        <p>We understand the critical role that polished, scroll-stopping video editing plays in shaping how long people actually watch your content.</p>
                       </div>
                     </div>
                     <div className="cs_case_study cs_style_1 cs_hover_active " style={{ margin: '0 !important' }} data-aos="fade-up" data-aos-duration="1400">
                       <a href="#" className="cs_case_study_thumb cs_case_study_thumb7 cs_bg_filed" style={{ backgroundImage: 'url(/assets/img/all-images/case-img7.png)' }}></a>
                       <div className="content-area1">
-                        <a href="#">Analytics &amp; Reporting</a>
+                        <a href="#">Custom Software Development</a>
                       </div>
                       <div className="content-area">
-                        <a href="#">Analytics &amp; Reporting</a>
-                        <p>We understand the critical role that a well-designed and user-friendly website plays in shaping your online presence driving.</p>
+                        <a href="#">Custom Software Development</a>
+                        <p>We understand the critical role that custom-built software plays in shaping efficient workflows once you outgrow generic, off-the-shelf tools.</p>
                       </div>
                     </div>
                   </div>
@@ -351,8 +351,8 @@ export default function Home() {
                 <div className="testimonial-header heading2 text-center">
                   <img src="/assets/img/elements/star2.png" alt="" className="star2 keyframe5" />
                   <img src="/assets/img/elements/star2.png" alt="" className="star3 keyframe5" />
-                  <h2 className="text-anime-style-3">What Our Client Say <br className="d-md-block d-none" /> On Google Reviews</h2>
-                  <p data-aos="fade-up" data-aos-duration="1000">Don't just take our word for it. Hear what our satisfied clients <br className="d-md-block d-none" /> have to say about their experience partnering with SEOC</p>
+                  <h2 className="text-anime-style-3">What Our Clients Say <br className="d-md-block d-none" /> On Google Reviews</h2>
+                  <p data-aos="fade-up" data-aos-duration="1000">Don't just take our word for it. Hear what our satisfied clients <br className="d-md-block d-none" /> have to say about their experience partnering with Connecting Scripts</p>
                 </div>
               </div>
             </div>
@@ -363,7 +363,7 @@ export default function Home() {
                     <div className="row">
                       <div className="col-lg-5">
                         <div className="pera">
-                          <p>"Working with SEOC has been a game-changer for our business. Their expertise in SEO and digital marketing has helped us achieve remarkable results and significantly increase our online visibility.</p>
+                          <p>"Working with Connecting Scripts has been a game-changer for our business. Their SEO and website work helped us rank higher and finally convert visitors into paying customers.</p>
                           <div className="space100"></div>
                           <div className="space30"></div>
                           <div className="list-area">
@@ -375,7 +375,7 @@ export default function Home() {
                                 <li><i className="fa-solid fa-star"></i></li>
                                 <li><i className="fa-solid fa-star"></i></li>
                               </ul>
-                              <a href="#">John Doe</a>
+                              <a href="#">Mr. Ankur Verma</a>
                             </div>
                             <img src="/assets/img/icons/google.svg" alt="Google Review" />
                           </div>
@@ -393,7 +393,7 @@ export default function Home() {
                     <div className="row">
                       <div className="col-lg-5">
                         <div className="pera">
-                          <p>"Working with SEOC has been a game-changer for our business. Their expertise in SEO and digital marketing has helped us achieve remarkable results and significantly increase our online visibility.</p>
+                          <p>"Connecting Scripts completely rebuilt our social presence. Their content and ad strategy took us from a handful of inquiries a month to a full booking calendar.</p>
                           <div className="space100"></div>
                           <div className="space30"></div>
                           <div className="list-area">
@@ -405,7 +405,7 @@ export default function Home() {
                                 <li><i className="fa-solid fa-star"></i></li>
                                 <li><i className="fa-solid fa-star"></i></li>
                               </ul>
-                              <a href="#">John Doe</a>
+                              <a href="#">Mr. Ashish Vyas</a>
                             </div>
                             <img src="/assets/img/icons/google.svg" alt="Google Review" />
                           </div>
@@ -423,7 +423,7 @@ export default function Home() {
                     <div className="row">
                       <div className="col-lg-5">
                         <div className="pera">
-                          <p>"Working with SEOC has been a game-changer for our business. Their expertise in SEO and digital marketing has helped us achieve remarkable results and significantly increase our online visibility.</p>
+                          <p>"From our website to our ad campaigns, Connecting Scripts handled everything with real strategy behind it. Our leads tripled within the first two months.</p>
                           <div className="space100"></div>
                           <div className="space30"></div>
                           <div className="list-area">
@@ -435,7 +435,7 @@ export default function Home() {
                                 <li><i className="fa-solid fa-star"></i></li>
                                 <li><i className="fa-solid fa-star"></i></li>
                               </ul>
-                              <a href="#">John Doe</a>
+                              <a href="#">Mr. Hamza</a>
                             </div>
                             <img src="/assets/img/icons/google.svg" alt="Google Review" />
                           </div>
@@ -463,8 +463,8 @@ export default function Home() {
                 <div className="blog-hedaer-area heading2 text-center">
                   <img src="/assets/img/elements/star2.png" alt="" className="star2 keyframe5" />
                   <img src="/assets/img/elements/star2.png" alt="" className="star3 keyframe5" />
-                  <h2 className="text-anime-style-3">Insights &amp; Innovations: <br className="d-md-block d-none" /> Our Latest Blog Posts</h2>
-                  <p data-aos="fade-up" data-aos-duration="1000">Explore our blog to discover actionable insights, success stories, and <br className="d-md-block d-none" /> expert advice that can help drive growth for your business.</p>
+                  <h2 className="text-anime-style-3">Insights &amp; Strategy: <br className="d-md-block d-none" /> Our Latest Blog Posts</h2>
+                  <p data-aos="fade-up" data-aos-duration="1000">Explore our blog to discover actionable insights, success stories, and <br className="d-md-block d-none" /> expert advice that can help drive real growth for your business.</p>
                 </div>
               </div>
             </div>
@@ -477,12 +477,12 @@ export default function Home() {
                   <div className="content-area">
                     <div className="tags-area">
                       <ul>
-                        <li><a href="#"><img src="/assets/img/icons/contact1.svg" alt="" />Ben Stokes</a></li>
-                        <li><a href="#"><img src="/assets/img/icons/calender1.svg" alt="" />16 August 2023</a></li>
+                        <li><a href="#"><img src="/assets/img/icons/contact1.svg" alt="" />Abhinav Jain</a></li>
+                        <li><a href="#"><img src="/assets/img/icons/calender1.svg" alt="" />14 Jul 2026</a></li>
                       </ul>
                     </div>
                     <Link href="/blogs/blog-single">10 Essential SEO Tips to Boost Your Website's Ranking</Link>
-                    <p>Are you looking to improve your website's visibility and attract more organic traffic? </p>
+                    <p>Looking to improve your website's visibility and attract more organic traffic this year?</p>
                     <Link href="/blogs/blog-single" className="readmore">Read More <i className="fa-solid fa-arrow-right"></i></Link>
                   </div>
                 </div>
@@ -497,12 +497,12 @@ export default function Home() {
                   <div className="content-area">
                     <div className="tags-area">
                       <ul>
-                        <li><a href="#"><img src="/assets/img/icons/contact1.svg" alt="" />Ben Stokes</a></li>
-                        <li><a href="#"><img src="/assets/img/icons/calender1.svg" alt="" />16 August 2023</a></li>
+                        <li><a href="#"><img src="/assets/img/icons/contact1.svg" alt="" />Abhinav Jain</a></li>
+                        <li><a href="#"><img src="/assets/img/icons/calender1.svg" alt="" />11 Jul 2026</a></li>
                       </ul>
                     </div>
-                    <Link href="/blogs/blog-single">The Power of PPC Advertising: How to Maximize Your ROI</Link>
-                    <p>Unlock the full potential of your digital marketing strategy with the power of PPC.</p>
+                    <Link href="/blogs/blog-single">Google Ads vs Meta Ads: How to Maximize Your ROI</Link>
+                    <p>Unlock the full potential of your ad budget with the right paid marketing strategy.</p>
                     <Link href="/blogs/blog-single" className="readmore">Read More <i className="fa-solid fa-arrow-right"></i></Link>
                   </div>
                 </div>
@@ -517,12 +517,12 @@ export default function Home() {
                   <div className="content-area">
                     <div className="tags-area">
                       <ul>
-                        <li><a href="#"><img src="/assets/img/icons/contact1.svg" alt="" />Ben Stokes</a></li>
-                        <li><a href="#"><img src="/assets/img/icons/calender1.svg" alt="" />16 August 2023</a></li>
+                        <li><a href="#"><img src="/assets/img/icons/contact1.svg" alt="" />Abhinav Jain</a></li>
+                        <li><a href="#"><img src="/assets/img/icons/calender1.svg" alt="" />06 Jul 2026</a></li>
                       </ul>
                     </div>
-                    <Link href="/blogs/blog-single">The Importance of Responsive Web Design in the Mobile Age</Link>
-                    <p>Where mobile devices dominate internet usage, responsive web design more crucial.</p>
+                    <Link href="/blogs/blog-single">Why Responsive Web Design Still Matters in the App Age</Link>
+                    <p>With mobile devices dominating internet usage, responsive design is more crucial than ever.</p>
                     <Link href="/blogs/blog-single" className="readmore">Read More <i className="fa-solid fa-arrow-right"></i></Link>
                   </div>
                 </div>
@@ -541,7 +541,7 @@ export default function Home() {
                   <img src="/assets/img/elements/star2.png" alt="" className="star2 keyframe5" />
                   <img src="/assets/img/elements/star2.png" alt="" className="star3 keyframe5" />
                   <h2 className="text-anime-style-3">Get In Touch With Us Today</h2>
-                  <p>We're here to help! If you have any questions or would like to discuss <br className="d-md-block d-none" /> how our SEO and digital marketing services can benefit your business,</p>
+                  <p>We're here to help! If you have any questions or would like to discuss <br className="d-md-block d-none" /> how our digital marketing services can grow your business,</p>
                 </div>
               </div>
             </div>
@@ -549,7 +549,7 @@ export default function Home() {
               <div className="col-lg-5" data-aos="zoom-out" data-aos-duration="1000">
                 <div className="contact-info-area">
                   <h3>Contact Info</h3>
-                  <p>We're here to help! If you have any questions or would like to discuss how our SEO and digital marketing services can benefit your business,</p>
+                  <p>We're here to help! If you have any questions or would like to discuss how our digital marketing services can benefit your business,</p>
                   <div className="space32"></div>
                   <div className="contact-auhtor-box">
                     <div className="icons">
@@ -557,7 +557,7 @@ export default function Home() {
                     </div>
                     <div className="content">
                       <h4>Our Location</h4>
-                      <a href="#">8708 Technology Forest Pl Suite <br className="d-lg-block d-none" /> 125 -G, The Woodlands, TX 773</a>
+                      <a href="#">Bangalore, India</a>
                     </div>
                   </div>
                   <div className="space40"></div>
@@ -567,8 +567,7 @@ export default function Home() {
                     </div>
                     <div className="content">
                       <h4>Phone Number</h4>
-                      <a href="tel:123-456-7890">123-456-7890 <br />
-                        123-456-7890</a>
+                      <a href="tel:+919214544078">+91 92145 44078</a>
                     </div>
                   </div>
                   <div className="space40"></div>
@@ -578,8 +577,7 @@ export default function Home() {
                     </div>
                     <div className="content">
                       <h4>Email Address</h4>
-                      <a href="mailto:infoseoc@.gmail.com">infoseoc@.gmail.com <br />
-                      infoseoc@.gmail.com</a>
+                      <a href="mailto:sales@connectingscripts.co.in">sales@connectingscripts.co.in</a>
                     </div>
                   </div>
                 </div>
@@ -587,7 +585,7 @@ export default function Home() {
               <div className="col-lg-7" data-aos="zoom-out" data-aos-duration="1200">
                 <div className="contact-boxarea">
                    <h3>Get In Touch</h3>
-                   <p>We're here to help! If you have any questions or would like to discuss <br className="d-lg-block d-none" /> how our SEO and digital marketing services can benefit your business,</p>
+                   <p>We're here to help! If you have any questions or would like to discuss <br className="d-lg-block d-none" /> how our digital marketing services can benefit your business,</p>
                    <form action="https://api.web3forms.com/submit" method="POST">
                     <div className="row">
                       <div className="col-lg-6">
@@ -615,11 +613,14 @@ export default function Home() {
                         <div className="input-area">
                           <select name="country" id="country" className="country-area nice-select6" defaultValue="1">
                             <option value="1" data-display="Service Type">Service Type</option>
-                            <option value="Belgium">Belgium</option>
-                            <option value="Brezil">Brezil</option>
-                            <option value="Argentina">Argentina</option>
-                            <option value="Bangladesh">Bangladesh</option>
-                            <option value="Germany">Germany</option>
+                            <option value="Website Development">Website Development</option>
+                            <option value="Mobile App Development">Mobile App Development</option>
+                            <option value="SEO">SEO</option>
+                            <option value="Google & Meta Ads">Google &amp; Meta Ads</option>
+                            <option value="Social Media Management">Social Media Management</option>
+                            <option value="Graphic Design">Graphic Design</option>
+                            <option value="Video Editing">Video Editing</option>
+                            <option value="Custom Software Development">Custom Software Development</option>
                           </select>
                         </div>
                       </div>
@@ -630,7 +631,7 @@ export default function Home() {
                       </div>
                       <div className="col-lg-12">
                         <div className="input-area">
-                          <button className="header-btn1">Free Consultation <span><i className="fa-solid fa-arrow-right"></i></span></button>
+                          <button className="header-btn1">Get My Free Consultation <span><i className="fa-solid fa-arrow-right"></i></span></button>
                         </div>
                       </div>
                      </div>
@@ -650,8 +651,8 @@ export default function Home() {
             <div className="row">
               <div className="col-lg-12 m-auto">  
                 <div className="cta-header-area text-center sp4 heading2">
-                  <h2 className="text-anime-style-3">Ready To Take Your SEO To <br className="d-md-block d-none" /> The Next Level</h2>
-                  <p data-aos="fade-up" data-aos-duration="1000">Effective SEO strategies not only elevate a website's visibility but also drive <br className="d-md-block d-none" /> targeted traffic, enhance user experience,</p>
+                  <h2 className="text-anime-style-3">Ready To Take Your Brand To <br className="d-md-block d-none" /> The Next Level</h2>
+                  <p data-aos="fade-up" data-aos-duration="1000">A complete digital strategy doesn't just boost visibility — it drives <br className="d-md-block d-none" /> targeted traffic, converts visitors, and grows revenue,</p>
                   <div className="btn-area text-center" data-aos="fade-up" data-aos-duration="1200">
                     <Link href="/contact-us" className="header-btn1">Free Consultation <span><i className="fa-solid fa-arrow-right"></i></span></Link>
                   </div>

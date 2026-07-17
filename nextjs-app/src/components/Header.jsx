@@ -11,7 +11,7 @@ export default function Header() {
               <div className="col-lg-12">
                 <div className="header-elements">
                   <div className="site-logo">
-                    <Link href="/"><img src="/assets/img/logo/logo1.png" alt="SEOC Logo" /></Link>
+                    <Link href="/"><img src="/assets/img/logo/logo1.png" alt="Connecting Scripts Logo" /></Link>
                   </div>
                   <div className="main-menu">
                     <ul>
@@ -55,7 +55,7 @@ export default function Header() {
           <div className="col-12">
             <div className="mobile-header-elements">
               <div className="mobile-logo">
-                <Link href="/"><img src="/assets/img/logo/logo1.png" alt="SEOC Logo" /></Link>
+                <Link href="/"><img src="/assets/img/logo/logo1.png" alt="Connecting Scripts Logo" /></Link>
               </div>
               <div className="mobile-nav-icon dots-menu">
                 <i className="fa-solid fa-bars"></i>
@@ -68,7 +68,7 @@ export default function Header() {
       <div className="mobile-sidebar mobile-sidebar1">
         <div className="logosicon-area">
           <div className="logos">
-            <img src="/assets/img/logo/logo1.png" alt="SEOC Logo" />
+            <img src="/assets/img/logo/logo1.png" alt="Connecting Scripts Logo" />
           </div>
           <div className="menu-close">
             <i className="fa-solid fa-xmark"></i>
@@ -95,7 +95,7 @@ export default function Header() {
                     <i className="fa-solid fa-phone-volume"></i>
                   </div>
                   <div className="contact-info-text">
-                    <a href="tel:+3(924)4596512">+3(924)4596512</a>
+                    <a href="tel:+919214544078">+91 92145 44078</a>
                   </div>
                 </div>
 
@@ -104,7 +104,7 @@ export default function Header() {
                     <i className="fa-solid fa-envelope"></i>
                   </div>
                   <div className="contact-info-text">
-                    <a href="mailto:info@example.com">info@example.com</a>
+                    <a href="mailto:sales@connectingscripts.co.in">sales@connectingscripts.co.in</a>
                   </div>
                 </div>
 
@@ -115,7 +115,7 @@ export default function Header() {
                       <i className="fa-solid fa-location-dot"></i>
                     </div>
                     <div className="contact-info-text">
-                      <a href="mailto:info@example.com">55 East Birchwood Ave.Brooklyn, <br /> New York 11201,United States</a>
+                      <a href="#">Bangalore, India</a>
                     </div>
                   </div>
                 </div>

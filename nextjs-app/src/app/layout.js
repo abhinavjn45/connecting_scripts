@@ -2,8 +2,8 @@ import Script from 'next/script';
 import "./globals.css";
 
 export const metadata = {
-  title: "SEOC - Your trusted partner for comprehensive SEO and digital marketing solutions.",
-  description: "We specialize in revolutionizing your online presence through expert SEO and digital marketing strategies.",
+  title: "Connecting Scripts - Full-Service Digital Marketing Agency for Websites, SEO & Ads",
+  description: "Connecting Scripts builds websites & apps, manages SEO, Google & Meta Ads, and creates content that turns visibility into paying customers.",
 };
 
 export default function RootLayout({ children }) {
