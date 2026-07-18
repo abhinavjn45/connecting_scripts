@@ -110,6 +110,29 @@ async function initializeDatabase() {
         `);
         console.log('Migration: Password Manager tables created successfully.');
       }
+      
+      // Ensure backup_schedules table exists
+      const [backupSchedulesCheck] = await db.query(`
+        SELECT COUNT(*) as count 
+        FROM information_schema.tables 
+        WHERE table_schema = ? AND table_name = 'backup_schedules'
+      `, [process.env.DB_NAME]);
+      
+      if (backupSchedulesCheck[0].count === 0) {
+        console.log('Migration: Creating Backup Schedules table...');
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS \`backup_schedules\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`schedule_time\` VARCHAR(5) NOT NULL,
+            \`is_active\` BOOLEAN DEFAULT TRUE,
+            \`added_by\` INT NOT NULL,
+            \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (\`added_by\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log('Migration: Backup Schedules table created successfully.');
+      }
+
       return;
     }
 

@@ -51,24 +51,13 @@ app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 app.use(cookieParser());
 
 // Initialize database schema tables on server boot
+const backupService = require('./services/backupService');
+
 initializeDatabase().then(() => {
   console.log('Database verification phase completed.');
+  // Initialize scheduled backups from the database
+  backupService.initScheduledBackups();
 });
-
-// Setup automated database backups
-const { performBackup } = require('./services/backupService');
-
-// Main recurring daily backup at 11:59 PM IST
-cron.schedule('59 23 * * *', () => {
-  console.log('[Cron] Running scheduled daily database backup at 11:59 PM...');
-  performBackup();
-}, { timezone: 'Asia/Kolkata' });
-
-// Temporary backup requested for 02:40 AM IST
-cron.schedule('45 2 * * *', () => {
-  console.log('[Cron] Running temporary requested database backup at 02:40 AM...');
-  performBackup();
-}, { timezone: 'Asia/Kolkata' });
 
 // Route Handlers
 const authRoutes = require('./routes/auth');
@@ -76,12 +65,14 @@ const profileRoutes = require('./routes/profile');
 const assetRoutes = require('./routes/assets');
 const usersRoutes = require('./routes/users');
 const vaultRoutes = require('./routes/vault');
+const backupsRoutes = require('./routes/backups');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/vault', vaultRoutes);
+app.use('/api/backups', backupsRoutes);
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
