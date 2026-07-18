@@ -1,77 +1,281 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 
 export default function SiteHealthPage() {
+  const router = useRouter();
+  
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [cpuHistory, setCpuHistory] = useState([]);
+  
+  // RBAC
+  const [canRead, setCanRead] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cs_rbac_permissions");
+    if (stored) {
+      try {
+        const perms = JSON.parse(stored);
+        if (perms.site_health && perms.site_health.read) {
+          setCanRead(true);
+        }
+      } catch (err) {}
+    }
+    
+    // Initial fetch
+    fetchMetrics();
+    
+    // Poll every 3 seconds for live dashboard effect
+    const interval = setInterval(fetchMetrics, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchMetrics = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/health/metrics`, {
+        credentials: "include"
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setMetrics(data.data);
+        setError(null);
+        
+        // Update CPU History for the live chart (keep last 20 data points)
+        setCpuHistory(prev => {
+          const newPoint = { 
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
+            cpu: parseFloat(data.data.system.cpu.usagePercent) 
+          };
+          const newHistory = [...prev, newPoint];
+          if (newHistory.length > 20) newHistory.shift();
+          return newHistory;
+        });
+      } else {
+        if (res.status === 403 || res.status === 401) {
+          setCanRead(false);
+        } else {
+          setError(data.message || "Failed to load metrics");
+        }
+      }
+    } catch (err) {
+      console.error("Health API Error:", err);
+      setError("Network error connecting to health API");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  const getStatusColor = (status) => {
+    return status === 'online' ? 'var(--success-color)' : 'var(--danger-color)';
+  };
+
+  if (!canRead && !loading) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <h2>Access Denied</h2>
+        <p>You do not have permission to view the Site Health module.</p>
+      </div>
+    );
+  }
+
   return (
     <>
-      <div className="card" style={{ marginBottom: "24px" }}>
-        <h2>Site Health Summary</h2>
-        <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
-          Monitor live server metrics, database performance metrics, and SSL certificates to ensure Connecting Scripts remains fully functional.
-        </p>
-      </div>
-
-      <div className="stats-grid" style={{ marginBottom: "24px" }}>
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>Overall Uptime</p>
-            <h3>99.98%</h3>
-          </div>
-          <div className="stat-icon-wrap success" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>Avg Response Time</p>
-            <h3>184 ms</h3>
-          </div>
-          <div className="stat-icon-wrap primary">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-info">
-            <p>SSL Status</p>
-            <h3>Active</h3>
-          </div>
-          <div className="stat-icon-wrap success" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", gap: "16px", flexWrap: "wrap", animation: "fadeIn 0.5s ease" }}>
+        <div>
+          <h2 style={{ margin: "0 0 6px 0", fontSize: "22px", fontWeight: "700", color: "var(--text-color)" }}>Site Health & Monitoring</h2>
+          <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "14px" }}>Real-time server metrics, database performance, and audit logs.</p>
         </div>
       </div>
 
-      <div className="card">
-        <h3 style={{ marginBottom: "16px" }}>Detailed Diagnostic Logs</h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "10px", borderBottom: "1px solid var(--border-color)", fontSize: "14px" }}>
-            <span>Database Query Execution Speed</span>
-            <strong style={{ color: "var(--success-color)" }}>12ms (Excellent)</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "10px", borderBottom: "1px solid var(--border-color)", fontSize: "14px" }}>
-            <span>NodeJS Process Memory Usage</span>
-            <strong>32.4 MB / 512 MB</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "10px", borderBottom: "1px solid var(--border-color)", fontSize: "14px" }}>
-            <span>Storage Disk Capacity</span>
-            <strong>1.2 GB / 50 GB Used</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
-            <span>Third-Party API Integrations</span>
-            <strong style={{ color: "var(--success-color)" }}>All Online (3/3)</strong>
-          </div>
+      {loading && !metrics ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "60px" }}>
+          <div className="spinner"></div>
         </div>
-      </div>
+      ) : error ? (
+        <div style={{ padding: "20px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "8px" }}>
+          <strong>Error:</strong> {error}
+        </div>
+      ) : metrics && (
+        <>
+          {/* TOP METRICS ROW */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "24px", marginBottom: "24px" }}>
+            
+            {/* Server Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: "4px solid var(--primary-color)" }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>SERVER PLATFORM</div>
+              <div style={{ fontSize: "24px", fontWeight: "700" }}>{metrics.system.os.platform} / {metrics.system.os.distro}</div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Uptime: {Math.floor(metrics.system.os.uptime / 3600)}h {Math.floor((metrics.system.os.uptime % 3600) / 60)}m
+              </div>
+            </div>
+
+            {/* DB Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: `4px solid ${getStatusColor(metrics.database.status)}` }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>DATABASE (MySQL)</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.database.status) }}></div>
+                <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.database.status}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Ping: {metrics.database.responseTimeMs}ms • Size: {formatBytes(metrics.database.databaseSize)}
+              </div>
+            </div>
+
+            {/* Cloudinary Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: `4px solid ${getStatusColor(metrics.services.cloudinary.status)}` }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>CLOUDINARY STORAGE</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.services.cloudinary.status) }}></div>
+                <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.services.cloudinary.status}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Ping: {metrics.services.cloudinary.responseTimeMs}ms
+              </div>
+            </div>
+
+          </div>
+
+          {/* CHARTS ROW */}
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px", marginBottom: "24px" }}>
+            
+            {/* CPU Chart */}
+            <div className="card" style={{ padding: "24px" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: "600", margin: "0 0 20px 0" }}>Live CPU Usage ({metrics.system.cpu.cores} Cores)</h3>
+              <div style={{ height: "300px", width: "100%" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cpuHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--primary-color)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--primary-color)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                    <XAxis dataKey="time" tick={{ fontSize: 10, fill: "var(--text-muted)" }} tickMargin={10} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "var(--text-muted)" }} unit="%" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: "var(--surface-color)", borderColor: "var(--border-color)", borderRadius: "8px", color: "var(--text-color)" }}
+                      itemStyle={{ color: "var(--primary-color)", fontWeight: "600" }}
+                    />
+                    <Area type="monotone" dataKey="cpu" stroke="var(--primary-color)" strokeWidth={3} fillOpacity={1} fill="url(#colorCpu)" isAnimationActive={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Memory & Disk */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div className="card" style={{ padding: "24px", flex: 1 }}>
+                <h3 style={{ fontSize: "16px", fontWeight: "600", margin: "0 0 20px 0" }}>Memory (RAM)</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "14px" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Used: {formatBytes(metrics.system.memory.used)}</span>
+                  <span style={{ fontWeight: "600" }}>{metrics.system.memory.usagePercent}%</span>
+                </div>
+                <div style={{ width: "100%", height: "12px", backgroundColor: "var(--border-color)", borderRadius: "6px", overflow: "hidden", marginBottom: "8px" }}>
+                  <div style={{ 
+                    height: "100%", 
+                    width: `${metrics.system.memory.usagePercent}%`, 
+                    backgroundColor: metrics.system.memory.usagePercent > 85 ? "var(--danger-color)" : "var(--primary-color)",
+                    transition: "width 0.5s ease"
+                  }}></div>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", textAlign: "right" }}>Total: {formatBytes(metrics.system.memory.total)}</div>
+              </div>
+
+              <div className="card" style={{ padding: "24px", flex: 1 }}>
+                <h3 style={{ fontSize: "16px", fontWeight: "600", margin: "0 0 20px 0" }}>Disk Space</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "14px" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Used: {formatBytes(metrics.system.disk.used)}</span>
+                  <span style={{ fontWeight: "600" }}>{metrics.system.disk.usagePercent}%</span>
+                </div>
+                <div style={{ width: "100%", height: "12px", backgroundColor: "var(--border-color)", borderRadius: "6px", overflow: "hidden", marginBottom: "8px" }}>
+                  <div style={{ 
+                    height: "100%", 
+                    width: `${metrics.system.disk.usagePercent}%`, 
+                    backgroundColor: metrics.system.disk.usagePercent > 90 ? "var(--danger-color)" : "var(--success-color)",
+                    transition: "width 0.5s ease"
+                  }}></div>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", textAlign: "right" }}>Free: {formatBytes(metrics.system.disk.available)}</div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* AUDIT LOGS TERMINAL */}
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+             <div style={{ padding: "16px 24px", backgroundColor: "#1e1e1e", display: "flex", alignItems: "center", gap: "12px" }}>
+               <div style={{ display: "flex", gap: "6px" }}>
+                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#ff5f56" }}></div>
+                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#ffbd2e" }}></div>
+                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#27c93f" }}></div>
+               </div>
+               <h3 style={{ fontSize: "14px", fontWeight: "600", margin: 0, color: "#fff", letterSpacing: "1px" }}>SYSTEM_AUDIT_LOGS</h3>
+             </div>
+             
+             <div style={{ backgroundColor: "#0d0d0d", padding: "20px 24px", minHeight: "300px", maxHeight: "400px", overflowY: "auto", fontFamily: "monospace", color: "#a5d6ff", fontSize: "13px" }}>
+               {metrics.recentAuditLogs && metrics.recentAuditLogs.length > 0 ? (
+                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                   <tbody>
+                     {metrics.recentAuditLogs.map(log => (
+                       <tr key={log.id} style={{ borderBottom: "1px solid #333" }}>
+                         <td style={{ padding: "10px 0", width: "160px", color: "#8b949e" }}>
+                           [{new Date(log.created_at).toLocaleString()}]
+                         </td>
+                         <td style={{ padding: "10px 16px", width: "180px", color: "#79c0ff" }}>
+                           {log.action}
+                         </td>
+                         <td style={{ padding: "10px 16px", color: "#d2a8ff" }}>
+                           {log.first_name} {log.last_name} (@{log.username})
+                         </td>
+                         <td style={{ padding: "10px 0", color: "#c9d1d9" }}>
+                           {log.details ? log.details : "N/A"}
+                         </td>
+                         <td style={{ padding: "10px 0", textAlign: "right", color: "#8b949e" }}>
+                           IP: {log.ip_address || "Unknown"}
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               ) : (
+                 <div style={{ color: "#8b949e" }}>&gt; No recent audit logs found in the database.</div>
+               )}
+             </div>
+          </div>
+        </>
+      )}
+
+      <style jsx global>{`
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid var(--border-color);
+          border-top-color: var(--primary-color);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 
+          to { transform: rotate(360deg); } 
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </>
   );
 }
