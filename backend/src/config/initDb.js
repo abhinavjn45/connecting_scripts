@@ -133,6 +133,44 @@ async function initializeDatabase() {
         console.log('Migration: Backup Schedules table created successfully.');
       }
 
+      // Ensure system_audit_logs table exists
+      const [auditLogsCheck] = await db.query(`
+        SELECT COUNT(*) as count 
+        FROM information_schema.tables 
+        WHERE table_schema = ? AND table_name = 'system_audit_logs'
+      `, [process.env.DB_NAME]);
+      
+      if (auditLogsCheck[0].count === 0) {
+        console.log('Migration: Creating System Audit Logs table...');
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS \`system_audit_logs\` (
+            \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+            \`user_id\` INT NULL,
+            \`module_key\` VARCHAR(100) NOT NULL,
+            \`action\` VARCHAR(50) NOT NULL,
+            \`details\` TEXT NULL,
+            \`ip_address\` VARCHAR(45) NULL,
+            \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE SET NULL,
+            INDEX \`idx_module\` (\`module_key\`),
+            INDEX \`idx_action\` (\`action\`)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log('Migration: System Audit Logs table created successfully.');
+      }
+
+      // Ensure site_health module exists
+      const [healthModuleCheck] = await db.query(
+        'SELECT id FROM modules WHERE module_key = ?', ['site_health']
+      );
+      if (healthModuleCheck.length === 0) {
+        console.log('Migration: Adding Site Health module...');
+        await db.query(
+          'INSERT INTO modules (module_key, module_name, category) VALUES (?, ?, ?)',
+          ['site_health', 'Site Health', 'System']
+        );
+      }
+
       return;
     }
 
