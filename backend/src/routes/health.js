@@ -10,10 +10,12 @@ router.use(verifyToken);
 // GET /api/health/metrics - Retrieve full system health metrics
 router.get('/metrics', requirePermission('site_health', 'read'), async (req, res) => {
   try {
-    const [system, database, cloudinaryStatus] = await Promise.all([
+    const [system, database, cloudinaryStatus, frontendStatus, emailStatus] = await Promise.all([
       healthService.getSystemMetrics(),
       healthService.getDatabaseStatus(),
-      healthService.getCloudinaryStatus()
+      healthService.getCloudinaryStatus(),
+      healthService.getFrontendStatus(),
+      healthService.getEmailServiceStatus()
     ]);
     
     // Also fetch the last 10 audit logs for the mini-terminal
@@ -29,9 +31,12 @@ router.get('/metrics', requirePermission('site_health', 'read'), async (req, res
       success: true,
       data: {
         system,
+        nodeProcess: healthService.getNodeProcessMetrics(),
         database,
         services: {
-          cloudinary: cloudinaryStatus
+          cloudinary: cloudinaryStatus,
+          frontend: frontendStatus,
+          email: emailStatus
         },
         recentAuditLogs: auditLogs
       }

@@ -132,6 +132,11 @@ export default function SiteHealthPage() {
               <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
                 Ping: {metrics.database.responseTimeMs}ms • Size: {formatBytes(metrics.database.databaseSize)}
               </div>
+              {metrics.database.error && (
+                <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {metrics.database.error}
+                </div>
+              )}
             </div>
 
             {/* Cloudinary Status Card */}
@@ -143,6 +148,54 @@ export default function SiteHealthPage() {
               </div>
               <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
                 Ping: {metrics.services.cloudinary.responseTimeMs}ms
+              </div>
+              {metrics.services.cloudinary.error && (
+                <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {metrics.services.cloudinary.error}
+                </div>
+              )}
+            </div>
+
+            {/* Frontend Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: `4px solid ${getStatusColor(metrics.services.frontend.status)}` }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>PUBLIC FRONTEND</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.services.frontend.status) }}></div>
+                <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.services.frontend.status}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Ping: {metrics.services.frontend.responseTimeMs}ms
+              </div>
+              {metrics.services.frontend.error && (
+                <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {metrics.services.frontend.error}
+                </div>
+              )}
+            </div>
+
+            {/* Email Service Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: `4px solid ${getStatusColor(metrics.services.email.status)}` }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>EMAIL SERVICE (RESEND)</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.services.email.status) }}></div>
+                <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.services.email.status}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Ping: {metrics.services.email.responseTimeMs}ms
+              </div>
+              {metrics.services.email.error && (
+                <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {metrics.services.email.error}
+                </div>
+              )}
+            </div>
+
+            {/* Node Process RAM */}
+            <div className="card" style={{ padding: "24px", borderLeft: "4px solid var(--primary-color)" }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>NODE.JS API MEMORY</div>
+              <div style={{ fontSize: "24px", fontWeight: "700" }}>{formatBytes(metrics.nodeProcess.rss)}</div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Heap Used: {formatBytes(metrics.nodeProcess.heapUsed)} / {formatBytes(metrics.nodeProcess.heapTotal)}
               </div>
             </div>
 

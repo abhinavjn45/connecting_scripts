@@ -105,6 +105,90 @@ class HealthService {
       };
     }
   }
+
+  /**
+   * Pings the public frontend to ensure it is online.
+   */
+  async getFrontendStatus() {
+    try {
+      const url = process.env.PUBLIC_FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:3000';
+      const start = Date.now();
+      const res = await fetch(url, { 
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000) 
+      });
+      const responseTime = Date.now() - start;
+
+      if (!res.ok && res.status >= 500) {
+        throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
+      }
+
+      return {
+        status: 'online',
+        responseTimeMs: responseTime,
+        url
+      };
+    } catch (error) {
+      console.error('HealthService: Frontend ping failed', error);
+      return {
+        status: 'offline',
+        responseTimeMs: null,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Pings the Resend Email API to verify authentication and service health.
+   */
+  async getEmailServiceStatus() {
+    try {
+      if (!process.env.RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY is not configured in .env');
+      }
+
+      const start = Date.now();
+      // A safe, read-only endpoint to verify the API key is active
+      const res = await fetch('https://api.resend.com/domains', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+      const responseTime = Date.now() - start;
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(`Resend Error ${res.status}: ${errorData.message || res.statusText}`);
+      }
+
+      return {
+        status: 'online',
+        responseTimeMs: responseTime
+      };
+    } catch (error) {
+      console.error('HealthService: Email service ping failed', error);
+      return {
+        status: 'offline',
+        responseTimeMs: null,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Tracks internal Node.js process memory usage.
+   */
+  getNodeProcessMetrics() {
+    const memUsage = process.memoryUsage();
+    return {
+      rss: memUsage.rss,       // Resident Set Size (total memory allocated for the process)
+      heapTotal: memUsage.heapTotal, // V8's memory usage
+      heapUsed: memUsage.heapUsed,
+      external: memUsage.external
+    };
+  }
 }
 
 module.exports = new HealthService();
