@@ -221,7 +221,7 @@ router.post('/manual', requirePermission('backups', 'create'), async (req, res) 
   try {
     // We don't await this because it runs in the background. 
     // The SSE endpoint will report its progress.
-    backupService.runManualBackup();
+    backupService.performBackup();
     
     await auditService.logAction(req.user.userId, 'backups', 'MANUAL_BACKUP', 'Triggered a manual database backup', req);
 

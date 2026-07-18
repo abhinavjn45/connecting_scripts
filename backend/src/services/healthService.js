@@ -58,21 +58,28 @@ class HealthService {
 
       // Try to get some basic stats about the db size
       let dbSize = 0;
+      let activeConnections = 0;
       try {
         const [sizeRows] = await db.query(`
           SELECT SUM(data_length + index_length) AS size 
           FROM information_schema.TABLES 
           WHERE table_schema = ?
         `, [process.env.DB_NAME]);
-        dbSize = sizeRows[0].size;
+        dbSize = sizeRows[0].size || 0;
+
+        const [connRows] = await db.query("SHOW STATUS LIKE 'Threads_connected'");
+        if (connRows && connRows.length > 0) {
+          activeConnections = parseInt(connRows[0].Value, 10);
+        }
       } catch(e) {
-        // Fallback or ignore if user doesn't have permission to query information_schema
+        // Fallback or ignore if user doesn't have permission to query information_schema or SHOW STATUS
       }
 
       return {
         status: 'online',
         responseTimeMs: responseTime,
-        databaseSize: dbSize
+        databaseSize: dbSize,
+        activeConnections
       };
     } catch (error) {
       console.error('HealthService: Database ping failed', error);
@@ -188,6 +195,71 @@ class HealthService {
       heapUsed: memUsage.heapUsed,
       external: memUsage.external
     };
+  }
+
+  /**
+   * Checks the status of automated backups (watchdog).
+   */
+  async getBackupWatchdogStatus() {
+    try {
+      const [rows] = await db.query(`
+        SELECT created_at FROM backups 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `);
+      
+      const lastBackup = rows.length > 0 ? rows[0].created_at : null;
+      let status = 'online';
+      let error = null;
+
+      if (!lastBackup) {
+        status = 'offline';
+        error = 'No backups found in the system.';
+      } else {
+        const hoursSinceLastBackup = (Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60);
+        if (hoursSinceLastBackup > 24) {
+          status = 'offline';
+          error = `Last backup was ${hoursSinceLastBackup.toFixed(1)} hours ago. Cron daemon may be failing.`;
+        }
+      }
+
+      return {
+        status,
+        lastBackup,
+        error
+      };
+    } catch (err) {
+      console.error('HealthService: Backup watchdog failed', err);
+      return { status: 'offline', error: err.message };
+    }
+  }
+
+  /**
+   * Checks for suspicious activity in the audit logs (brute-force).
+   */
+  async getSecurityTracker() {
+    try {
+      const [rows] = await db.query(`
+        SELECT ip_address, COUNT(*) as failed_attempts 
+        FROM system_audit_logs 
+        WHERE action = 'LOGIN_FAILED' AND created_at >= NOW() - INTERVAL 24 HOUR
+        GROUP BY ip_address
+        ORDER BY failed_attempts DESC
+        LIMIT 5
+      `);
+      
+      const totalFailed = rows.reduce((sum, row) => sum + parseInt(row.failed_attempts, 10), 0);
+      
+      return {
+        status: totalFailed > 20 ? 'offline' : 'online',
+        totalFailed24h: totalFailed,
+        topOffenders: rows,
+        error: totalFailed > 20 ? `High volume of failed logins detected (${totalFailed} in 24h).` : null
+      };
+    } catch (err) {
+      console.error('HealthService: Security tracker failed', err);
+      return { status: 'offline', error: err.message };
+    }
   }
 }
 

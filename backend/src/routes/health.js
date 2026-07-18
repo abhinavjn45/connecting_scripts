@@ -10,19 +10,21 @@ router.use(verifyToken);
 // GET /api/health/metrics - Retrieve full system health metrics
 router.get('/metrics', requirePermission('site_health', 'read'), async (req, res) => {
   try {
-    const [system, database, cloudinaryStatus, frontendStatus, emailStatus] = await Promise.all([
+    const [system, database, cloudinaryStatus, frontendStatus, emailStatus, watchdog, security] = await Promise.all([
       healthService.getSystemMetrics(),
       healthService.getDatabaseStatus(),
       healthService.getCloudinaryStatus(),
       healthService.getFrontendStatus(),
-      healthService.getEmailServiceStatus()
+      healthService.getEmailServiceStatus(),
+      healthService.getBackupWatchdogStatus(),
+      healthService.getSecurityTracker()
     ]);
     
     // Also fetch the last 10 audit logs for the mini-terminal
     const [auditLogs] = await db.query(`
       SELECT s.*, u.first_name, u.last_name, u.username
       FROM system_audit_logs s
-      JOIN users u ON s.user_id = u.id
+      LEFT JOIN users u ON s.user_id = u.id
       ORDER BY s.created_at DESC
       LIMIT 10
     `);
@@ -36,7 +38,9 @@ router.get('/metrics', requirePermission('site_health', 'read'), async (req, res
         services: {
           cloudinary: cloudinaryStatus,
           frontend: frontendStatus,
-          email: emailStatus
+          email: emailStatus,
+          watchdog,
+          security
         },
         recentAuditLogs: auditLogs
       }

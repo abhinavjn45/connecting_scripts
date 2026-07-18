@@ -129,8 +129,9 @@ export default function SiteHealthPage() {
                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.database.status) }}></div>
                 <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.database.status}</span>
               </div>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
-                Ping: {metrics.database.responseTimeMs}ms • Size: {formatBytes(metrics.database.databaseSize)}
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px", display: "flex", justifyContent: "space-between" }}>
+                <span>Ping: {metrics.database.responseTimeMs}ms • Size: {formatBytes(metrics.database.databaseSize)}</span>
+                <span style={{ color: "var(--primary-color)", fontWeight: "600" }}>{metrics.database.activeConnections} Connections</span>
               </div>
               {metrics.database.error && (
                 <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
@@ -186,6 +187,40 @@ export default function SiteHealthPage() {
               {metrics.services.email.error && (
                 <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
                   {metrics.services.email.error}
+                </div>
+              )}
+            </div>
+
+            {/* Backup Watchdog Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: `4px solid ${getStatusColor(metrics.services.watchdog.status)}` }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>BACKUP WATCHDOG</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.services.watchdog.status) }}></div>
+                <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.services.watchdog.status}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Last Backup: {metrics.services.watchdog.lastBackup ? new Date(metrics.services.watchdog.lastBackup).toLocaleString() : 'None'}
+              </div>
+              {metrics.services.watchdog.error && (
+                <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {metrics.services.watchdog.error}
+                </div>
+              )}
+            </div>
+
+            {/* Security Radar Status Card */}
+            <div className="card" style={{ padding: "24px", borderLeft: `4px solid ${getStatusColor(metrics.services.security.status)}` }}>
+              <div style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: "600" }}>SECURITY RADAR</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: getStatusColor(metrics.services.security.status) }}></div>
+                <span style={{ fontSize: "24px", fontWeight: "700", textTransform: "capitalize" }}>{metrics.services.security.status}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                Failed Logins (24h): {metrics.services.security.totalFailed24h}
+              </div>
+              {metrics.services.security.error && (
+                <div style={{ marginTop: "12px", padding: "8px 12px", backgroundColor: "var(--danger-light)", color: "var(--danger-color)", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {metrics.services.security.error}
                 </div>
               )}
             </div>
@@ -284,20 +319,20 @@ export default function SiteHealthPage() {
                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
                    <tbody>
                      {metrics.recentAuditLogs.map(log => (
-                       <tr key={log.id} style={{ borderBottom: "1px solid #333" }}>
-                         <td style={{ padding: "10px 0", width: "160px", color: "#8b949e" }}>
+                       <tr key={log.id} style={{ borderBottom: "1px solid #333", backgroundColor: log.action === 'SYSTEM_CRASH' ? 'rgba(255, 95, 86, 0.1)' : 'transparent' }}>
+                         <td style={{ padding: "10px 0", width: "160px", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#8b949e", paddingLeft: log.action === 'SYSTEM_CRASH' ? "8px" : "0" }}>
                            [{new Date(log.created_at).toLocaleString()}]
                          </td>
-                         <td style={{ padding: "10px 16px", width: "180px", color: "#79c0ff" }}>
+                         <td style={{ padding: "10px 16px", width: "180px", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#79c0ff", fontWeight: log.action === 'SYSTEM_CRASH' ? "bold" : "normal" }}>
                            {log.action}
                          </td>
-                         <td style={{ padding: "10px 16px", color: "#d2a8ff" }}>
-                           {log.first_name} {log.last_name} (@{log.username})
+                         <td style={{ padding: "10px 16px", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#d2a8ff" }}>
+                           {log.first_name ? `${log.first_name} ${log.last_name} (@${log.username})` : 'System Daemon'}
                          </td>
-                         <td style={{ padding: "10px 0", color: "#c9d1d9" }}>
+                         <td style={{ padding: "10px 0", color: log.action === 'SYSTEM_CRASH' ? "#ffbd2e" : "#c9d1d9" }}>
                            {log.details ? log.details : "N/A"}
                          </td>
-                         <td style={{ padding: "10px 0", textAlign: "right", color: "#8b949e" }}>
+                         <td style={{ padding: "10px 16px", textAlign: "right", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#8b949e" }}>
                            IP: {log.ip_address || "Unknown"}
                          </td>
                        </tr>

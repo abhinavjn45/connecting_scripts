@@ -95,6 +95,33 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Global Crash Tracker
+const db = require('./config/db');
+process.on('uncaughtException', async (err) => {
+  console.error('[CRITICAL] Uncaught Exception:', err);
+  try {
+    await db.query(
+      `INSERT INTO system_audit_logs (user_id, module_key, action, details, ip_address) VALUES (NULL, 'system', 'SYSTEM_CRASH', ?, 'localhost')`,
+      [err.message || 'Unknown Uncaught Exception']
+    );
+  } catch (dbErr) {
+    console.error('Failed to log crash to DB:', dbErr);
+  }
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+  try {
+    const errorMsg = reason instanceof Error ? reason.message : String(reason);
+    await db.query(
+      `INSERT INTO system_audit_logs (user_id, module_key, action, details, ip_address) VALUES (NULL, 'system', 'SYSTEM_CRASH', ?, 'localhost')`,
+      [`Unhandled Rejection: ${errorMsg}`]
+    );
+  } catch (dbErr) {
+    console.error('Failed to log crash to DB:', dbErr);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
