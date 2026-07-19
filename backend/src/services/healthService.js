@@ -203,7 +203,7 @@ class HealthService {
   async getBackupWatchdogStatus() {
     try {
       const [rows] = await db.query(`
-        SELECT created_at FROM backups 
+        SELECT created_at FROM backup_history 
         ORDER BY created_at DESC 
         LIMIT 1
       `);
