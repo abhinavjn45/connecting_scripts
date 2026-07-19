@@ -77,6 +77,8 @@ async function cleanupOldBackups() {
       for (let i = 0; i < toDelete.length; i += 100) {
         const chunk = toDelete.slice(i, i + 100);
         await cloudinary.api.delete_resources(chunk, { resource_type: 'raw' });
+        // Delete from local DB table
+        await db.query('DELETE FROM backup_history WHERE public_id IN (?)', [chunk]);
       }
       console.log('[Backup] Cleanup complete.');
     } else {
@@ -131,12 +133,14 @@ async function performBackup() {
       unique_filename: false
     });
 
+    // Save to database
+    await db.query(
+      'INSERT INTO backup_history (public_id, url, size, created_at) VALUES (?, ?, ?, ?)',
+      [uploadResult.public_id, uploadResult.secure_url, uploadResult.bytes, new Date(uploadResult.created_at)]
+    );
+
     updateProgress(85, 'Upload successful. Cleaning up older backups...');
     console.log(`[Backup] Upload successful: ${uploadResult.secure_url}`);
-
-    // Clean up local file
-    fs.unlinkSync(filepath);
-    console.log(`[Backup] Local file ${filename} removed.`);
 
     // After a successful backup, cleanup older backups
     await cleanupOldBackups();
@@ -145,9 +149,11 @@ async function performBackup() {
   } catch (error) {
     console.error('[Backup] Error during backup process:', error);
     updateProgress(0, 'Backup failed. Please check the logs.', error.message);
-    // Try to cleanup local file if it exists but upload failed
+  } finally {
+    // Ensure local file is removed even if upload or db insert fails
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
+      console.log(`[Backup] Local file ${filename} removed.`);
     }
   }
 }
@@ -188,6 +194,18 @@ function cancelScheduledBackup(id) {
  */
 async function initScheduledBackups() {
   try {
+    // Ensure the backup_history table exists on startup to prevent production errors
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS backup_history (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        public_id VARCHAR(255) NOT NULL UNIQUE,
+        url VARCHAR(500) NOT NULL,
+        size BIGINT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[BackupService] Ensured backup_history table exists.');
+
     const [rows] = await db.query('SELECT id, schedule_time FROM backup_schedules WHERE is_active = TRUE');
     console.log(`[BackupService] Found ${rows.length} active backup schedules in database.`);
     
@@ -195,7 +213,7 @@ async function initScheduledBackups() {
       scheduleBackup(schedule.id, schedule.schedule_time);
     });
   } catch (error) {
-    console.error('[BackupService] Failed to initialize scheduled backups:', error);
+    console.error('[BackupService] Failed to initialize scheduled backups or check tables:', error);
   }
 }
 

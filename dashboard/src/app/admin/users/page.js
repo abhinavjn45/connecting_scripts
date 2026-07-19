@@ -674,54 +674,68 @@ export default function UserManagementPage() {
             </table>
           </div>
         )}
-      </div>
 
-      {/* Pagination Controls */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px", fontSize: "13px", color: "var(--text-muted)", flexWrap: "wrap", gap: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span>Rows per page:</span>
-          <select 
-            className="form-input" 
-            style={{ padding: "6px 28px 6px 12px", fontSize: "13px", width: "auto", minHeight: "0" }}
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-          >
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={200}>200</option>
-          </select>
-        </div>
-        
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <span>
-            {totalUsers > 0 ? (page - 1) * limit + 1 : 0} - {Math.min(page * limit, totalUsers)} of {totalUsers}
-          </span>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
-              style={{ padding: "6px 10px", opacity: page === 1 ? 0.5 : 1, cursor: page === 1 ? "not-allowed" : "pointer" }}
-              disabled={page === 1}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
-              style={{ padding: "6px 10px", opacity: page * limit >= totalUsers ? 0.5 : 1, cursor: page * limit >= totalUsers ? "not-allowed" : "pointer" }}
-              disabled={page * limit >= totalUsers}
-              onClick={() => setPage(p => p + 1)}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
+        {/* Pagination Controls */}
+        {users.length > 0 && (
+          <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-color)", backgroundColor: "#fdfdfd" }}>
+            <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+              Showing <strong>{totalUsers > 0 ? (page - 1) * limit + 1 : 0}</strong> to <strong>{Math.min(page * limit, totalUsers)}</strong> of <strong>{totalUsers}</strong> users
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--text-muted)" }}>
+                Rows per page:
+                <select 
+                  value={limit} 
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border-color)", outline: "none", cursor: "pointer", backgroundColor: "#fff" }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: "4px" }}>
+                <button 
+                  type="button" 
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                  style={{ 
+                    padding: "6px 12px", 
+                    backgroundColor: page === 1 ? "var(--border-color)" : "#fff",
+                    color: page === 1 ? "var(--text-muted)" : "var(--text-color)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "6px",
+                    cursor: page === 1 ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    transition: "var(--transition)"
+                  }}
+                >
+                  Previous
+                </button>
+                <button 
+                  type="button" 
+                  disabled={page * limit >= totalUsers}
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ 
+                    padding: "6px 12px", 
+                    backgroundColor: page * limit >= totalUsers ? "var(--border-color)" : "#fff",
+                    color: page * limit >= totalUsers ? "var(--text-muted)" : "var(--text-color)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "6px",
+                    cursor: page * limit >= totalUsers ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    transition: "var(--transition)"
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Create / Edit User Modal */}

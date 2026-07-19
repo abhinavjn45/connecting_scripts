@@ -9,6 +9,16 @@ export default function DatabaseBackupsPage() {
   // State
   const [schedules, setSchedules] = useState([]);
   const [backups, setBackups] = useState([]);
+  
+  // Pagination State for Backups
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState("DESC");
+
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [loadingBackups, setLoadingBackups] = useState(true);
   
@@ -53,9 +63,35 @@ export default function DatabaseBackupsPage() {
     };
 
     fetchSchedules();
-    fetchBackups();
     checkStatus();
   }, [router]);
+
+  useEffect(() => {
+    fetchBackups();
+  }, [page, limit, debouncedSearch, sortBy, sortOrder]);
+
+  // Debounce search query
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortBy(column);
+      setSortOrder("ASC");
+    }
+    setPage(1);
+  };
+
+  const renderSortIndicator = (column) => {
+    if (sortBy !== column) return <span style={{ color: "var(--border-color)", marginLeft: "4px" }}>↕</span>;
+    return <span style={{ color: "var(--primary-color)", marginLeft: "4px" }}>{sortOrder === "ASC" ? "↑" : "↓"}</span>;
+  };
 
   const fetchSchedules = async () => {
     try {
@@ -77,12 +113,20 @@ export default function DatabaseBackupsPage() {
   const fetchBackups = async () => {
     try {
       setLoadingBackups(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/backups/history`, {
+      const params = new URLSearchParams({
+        page,
+        limit,
+        search: debouncedSearch,
+        sortBy,
+        sortOrder
+      });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/backups/history?${params.toString()}`, {
         credentials: "include"
       });
       const data = await res.json();
       if (data.success) {
-        setBackups(data.backups);
+        setBackups(data.backups || []);
+        setTotalCount(data.totalCount || 0);
       }
     } catch (err) {
       console.error("Failed to fetch backups");
@@ -403,9 +447,24 @@ export default function DatabaseBackupsPage() {
         {/* Column 9: History */}
         <div style={{ flex: crudPermissions.create ? "3 1 600px" : "1 1 100%", minWidth: 0 }}>
           <div className="card" style={{ padding: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
               <h3 style={{ fontSize: "16px", fontWeight: "600", margin: 0 }}>Backup History (Last 30 Days)</h3>
-              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              
+              <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ position: "relative", minWidth: "250px" }}>
+                  <svg style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Search backups..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ paddingLeft: "32px", fontSize: "13px", width: "100%", padding: "6px 12px 6px 32px" }}
+                  />
+                </div>
+
                 {crudPermissions.delete && selectedBackups.length > 0 && (
                   <button 
                     onClick={() => handleBulkDelete()} 
@@ -435,94 +494,156 @@ export default function DatabaseBackupsPage() {
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                   </svg>
-                  <p style={{ margin: 0 }}>No backups found. Backups will appear here once generated.</p>
+                  <p style={{ margin: 0 }}>No backups match your current filters.</p>
                 </div>
               ) : (
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: "40px", paddingLeft: "24px" }}>
-                        <input 
-                          type="checkbox" 
-                          checked={selectedBackups.length === backups.length && backups.length > 0} 
-                          onChange={handleToggleSelectAll} 
-                        />
-                      </th>
-                      <th>Backup File</th>
-                      <th>Size</th>
-                      <th>Generated At</th>
-                      <th style={{ textAlign: "right", paddingRight: "24px" }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {backups.map((backup) => (
-                      <tr key={backup.id} style={{ backgroundColor: selectedBackups.includes(backup.id) ? "var(--surface-hover)" : "transparent" }}>
-                        <td style={{ paddingLeft: "24px" }}>
+                <>
+                  <table className="custom-table" style={{ minWidth: "800px" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: "40px", paddingLeft: "24px" }}>
                           <input 
                             type="checkbox" 
-                            checked={selectedBackups.includes(backup.id)} 
-                            onChange={() => handleToggleSelect(backup.id)} 
+                            checked={selectedBackups.length === backups.length && backups.length > 0} 
+                            onChange={handleToggleSelectAll} 
                           />
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <div style={{ padding: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary-color)", borderRadius: "8px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                <polyline points="14 2 14 8 20 8"></polyline>
-                              </svg>
-                            </div>
-                            <div>
-                              <strong style={{ fontSize: "13px", display: "block", color: "var(--text-color)" }}>{backup.name}</strong>
-                              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>SQL Database Dump</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: "500" }}>{formatBytes(backup.size)}</span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: "13px" }}>
-                            {new Date(backup.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "right", paddingRight: "24px" }}>
-                          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            {crudPermissions.read && (
-                              <a 
-                                href={backup.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="btn btn-outline"
-                                style={{ padding: "6px 14px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                  <polyline points="7 10 12 15 17 10"></polyline>
-                                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                Download
-                              </a>
-                            )}
-                            {crudPermissions.delete && (
-                              <button 
-                                onClick={() => handleBulkDelete([backup.id])}
-                                className="btn btn-outline"
-                                style={{ padding: "6px 10px", fontSize: "12px", display: "inline-flex", alignItems: "center", borderColor: "var(--danger-color)", color: "var(--danger-color)" }}
-                                title="Delete Backup"
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6"></polyline>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                        </th>
+                        <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('name')}>Backup File {renderSortIndicator('name')}</th>
+                        <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('size')}>Size {renderSortIndicator('size')}</th>
+                        <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('created_at')}>Generated At {renderSortIndicator('created_at')}</th>
+                        <th style={{ textAlign: "right", paddingRight: "24px" }}>Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {backups.map((backup) => (
+                        <tr key={backup.id} style={{ backgroundColor: selectedBackups.includes(backup.id) ? "var(--surface-hover)" : "transparent" }}>
+                          <td style={{ paddingLeft: "24px" }}>
+                            <input 
+                              type="checkbox" 
+                              checked={selectedBackups.includes(backup.id)} 
+                              onChange={() => handleToggleSelect(backup.id)} 
+                            />
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <div style={{ padding: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary-color)", borderRadius: "8px" }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                  <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                              </div>
+                              <div>
+                                <strong style={{ fontSize: "13px", display: "block", color: "var(--text-color)" }}>{backup.name}</strong>
+                                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>SQL Database Dump</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: "500" }}>{formatBytes(backup.size)}</span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: "13px" }}>
+                              {new Date(backup.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "right", paddingRight: "24px" }}>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                              {crudPermissions.read && (
+                                <a 
+                                  href={backup.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="btn btn-outline"
+                                  style={{ padding: "6px 14px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                  </svg>
+                                  Download
+                                </a>
+                              )}
+                              {crudPermissions.delete && (
+                                <button 
+                                  onClick={() => handleBulkDelete([backup.id])}
+                                  className="btn btn-outline"
+                                  style={{ padding: "6px 10px", fontSize: "12px", display: "inline-flex", alignItems: "center", borderColor: "var(--danger-color)", color: "var(--danger-color)" }}
+                                  title="Delete Backup"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {/* Pagination Controls */}
+                  <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-color)", backgroundColor: "#fdfdfd" }}>
+                    <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                      Showing <strong>{(page - 1) * limit + 1}</strong> to <strong>{Math.min(page * limit, totalCount)}</strong> of <strong>{totalCount}</strong> backups
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--text-muted)" }}>
+                        Rows per page:
+                        <select 
+                          value={limit} 
+                          onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                          style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border-color)", outline: "none", cursor: "pointer", backgroundColor: "#fff" }}
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        <button 
+                          type="button" 
+                          disabled={page === 1}
+                          onClick={() => setPage(p => p - 1)}
+                          style={{ 
+                            padding: "6px 12px", 
+                            backgroundColor: page === 1 ? "var(--border-color)" : "#fff",
+                            color: page === 1 ? "var(--text-muted)" : "var(--text-color)",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: "6px",
+                            cursor: page === 1 ? "not-allowed" : "pointer",
+                            fontSize: "13px",
+                            fontWeight: "500",
+                            transition: "var(--transition)"
+                          }}
+                        >
+                          Previous
+                        </button>
+                        <button 
+                          type="button" 
+                          disabled={page * limit >= totalCount}
+                          onClick={() => setPage(p => p + 1)}
+                          style={{ 
+                            padding: "6px 12px", 
+                            backgroundColor: page * limit >= totalCount ? "var(--border-color)" : "#fff",
+                            color: page * limit >= totalCount ? "var(--text-muted)" : "var(--text-color)",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: "6px",
+                            cursor: page * limit >= totalCount ? "not-allowed" : "pointer",
+                            fontSize: "13px",
+                            fontWeight: "500",
+                            transition: "var(--transition)"
+                          }}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>

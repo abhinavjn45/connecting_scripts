@@ -31,37 +31,80 @@ const vaultRevealLimiter = rateLimit({
   message: { success: false, message: 'Too many password reveal attempts. Please wait 5 minutes.' }
 });
 
+const vaultMutationLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many password modifications. Please wait 1 minute.' }
+});
 
 // ---------------------------------------------------------
-// Helper: Encryption & Decryption
+// Helper: Encryption & Decryption (Envelope Encryption)
 // ---------------------------------------------------------
 function encrypt(text) {
   if (!text) return { encryptedData: null, iv: null, authTag: null };
-  const iv = crypto.randomBytes(12); // GCM standard IV size
-  const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+
+  // 1. Generate unique Data Encryption Key (DEK)
+  const dek = crypto.randomBytes(32);
   
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  const authTag = cipher.getAuthTag().toString('hex');
-  
+  // 2. Encrypt the actual password using DEK
+  const ivText = crypto.randomBytes(12);
+  const cipherText = crypto.createCipheriv(ALGORITHM, dek, ivText);
+  let encryptedText = cipherText.update(text, 'utf8', 'hex');
+  encryptedText += cipherText.final('hex');
+  const authTagText = cipherText.getAuthTag().toString('hex');
+
+  // 3. Encrypt the DEK using the static Master Key
+  const ivDek = crypto.randomBytes(12);
+  const masterKey = Buffer.from(ENCRYPTION_KEY, 'hex');
+  const cipherDek = crypto.createCipheriv(ALGORITHM, masterKey, ivDek);
+  let encryptedDek = cipherDek.update(dek.toString('hex'), 'utf8', 'hex');
+  encryptedDek += cipherDek.final('hex');
+  const authTagDek = cipherDek.getAuthTag().toString('hex');
+
+  // 4. Combine into a single payload
+  const combined = `env1.${encryptedDek}.${ivDek.toString('hex')}.${authTagDek}.${encryptedText}.${ivText.toString('hex')}.${authTagText}`;
+
   return {
-    encryptedData: encrypted,
-    iv: iv.toString('hex'),
-    authTag: authTag
+    encryptedData: combined,
+    iv: 'env1', // placeholder to satisfy DB constraints
+    authTag: 'env1' // placeholder
   };
 }
 
 function decrypt(encryptedData, ivHex, authTagHex) {
-  if (!encryptedData || !ivHex || !authTagHex) return null;
+  if (!encryptedData) return null;
   try {
+    if (encryptedData.startsWith('env1.')) {
+      const parts = encryptedData.split('.');
+      if (parts.length !== 7) throw new Error('Invalid envelope format');
+      const [, encryptedDekHex, dekIvHex, dekAuthTagHex, encryptedTextHex, textIvHex, textAuthTagHex] = parts;
+
+      const masterKey = Buffer.from(ENCRYPTION_KEY, 'hex');
+      
+      // Decrypt DEK
+      const decipherDek = crypto.createDecipheriv(ALGORITHM, masterKey, Buffer.from(dekIvHex, 'hex'));
+      decipherDek.setAuthTag(Buffer.from(dekAuthTagHex, 'hex'));
+      let dekHex = decipherDek.update(encryptedDekHex, 'hex', 'utf8');
+      dekHex += decipherDek.final('utf8');
+      const dek = Buffer.from(dekHex, 'hex');
+
+      // Decrypt Text
+      const decipherText = crypto.createDecipheriv(ALGORITHM, dek, Buffer.from(textIvHex, 'hex'));
+      decipherText.setAuthTag(Buffer.from(textAuthTagHex, 'hex'));
+      let text = decipherText.update(encryptedTextHex, 'hex', 'utf8');
+      text += decipherText.final('utf8');
+      return text;
+    }
+    
+    // Legacy fallback
+    if (!ivHex || !authTagHex) return null;
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-    
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
-    
     let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
@@ -103,18 +146,16 @@ router.get('/users/search', verifyToken, async (req, res) => {
 
     const searchTerm = `%${q}%`;
     const [users] = await db.query(`
-      SELECT id, first_name, last_name, company_email, personal_email, username, phone_number
+      SELECT id, first_name, last_name, company_email, username
       FROM users
       WHERE status = 'Active' AND (
         first_name LIKE ? OR 
         last_name LIKE ? OR 
         company_email LIKE ? OR 
-        personal_email LIKE ? OR 
-        username LIKE ? OR 
-        phone_number LIKE ?
+        username LIKE ?
       )
       LIMIT 10
-    `, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]);
+    `, [searchTerm, searchTerm, searchTerm, searchTerm]);
 
     return res.json({ success: true, users });
   } catch (error) {
@@ -129,6 +170,7 @@ router.get('/users/search', verifyToken, async (req, res) => {
 router.get('/', verifyToken, async (req, res) => {
   const userId = req.user.userId;
   const userRole = req.user.role;
+  const { page = 1, limit = 25, search = '', sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
 
   try {
     const hasRead = await checkModulePermission(userId, 'read');
@@ -136,30 +178,75 @@ router.get('/', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: 'You do not have permission to view the Password Manager.' });
     }
 
+    const offset = (Number(page) - 1) * Number(limit);
+    const parsedLimit = Number(limit) > 0 ? Number(limit) : 25;
+    
+    // Whitelist sortable columns to prevent SQL injection
+    const validSortColumns = ['title', 'url', 'username', 'auth_type', 'created_at'];
+    let sortColumn = 'v.created_at';
+    if (validSortColumns.includes(sortBy)) {
+      sortColumn = `v.${sortBy}`;
+    }
+    const orderDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const searchStr = `%${search}%`;
+
     let items = [];
+    let totalCount = 0;
+
     if (userRole === 'Super Admin') {
       // Super Admin sees everything
-      const [rows] = await db.query(`
+      const countQuery = `
+        SELECT COUNT(*) as count 
+        FROM vault_items v
+        WHERE v.title LIKE ? OR v.url LIKE ? OR v.username LIKE ?
+      `;
+      const [countRows] = await db.query(countQuery, [searchStr, searchStr, searchStr]);
+      totalCount = countRows[0].count;
+
+      const dataQuery = `
         SELECT v.id, v.title, v.url, v.username, v.auth_type, v.oauth_provider, v.notes, v.created_at, v.added_by, u.first_name, u.last_name
         FROM vault_items v
         LEFT JOIN users u ON v.added_by = u.id
-        ORDER BY v.created_at DESC
-      `);
+        WHERE v.title LIKE ? OR v.url LIKE ? OR v.username LIKE ?
+        ORDER BY ${sortColumn} ${orderDirection}
+        LIMIT ? OFFSET ?
+      `;
+      const [rows] = await db.query(dataQuery, [searchStr, searchStr, searchStr, parsedLimit, offset]);
       items = rows;
     } else {
       // Regular user sees what they created OR what was shared with them
-      const [rows] = await db.query(`
+      const countQuery = `
+        SELECT COUNT(DISTINCT v.id) as count 
+        FROM vault_items v
+        LEFT JOIN vault_item_access a ON v.id = a.item_id
+        WHERE (v.added_by = ? OR a.user_id = ?) 
+          AND (v.title LIKE ? OR v.url LIKE ? OR v.username LIKE ?)
+      `;
+      const [countRows] = await db.query(countQuery, [userId, userId, searchStr, searchStr, searchStr]);
+      totalCount = countRows[0].count;
+
+      const dataQuery = `
         SELECT DISTINCT v.id, v.title, v.url, v.username, v.auth_type, v.oauth_provider, v.notes, v.created_at, v.added_by, u.first_name, u.last_name
         FROM vault_items v
         LEFT JOIN users u ON v.added_by = u.id
         LEFT JOIN vault_item_access a ON v.id = a.item_id
-        WHERE v.added_by = ? OR a.user_id = ?
-        ORDER BY v.created_at DESC
-      `, [userId, userId]);
+        WHERE (v.added_by = ? OR a.user_id = ?) 
+          AND (v.title LIKE ? OR v.url LIKE ? OR v.username LIKE ?)
+        ORDER BY ${sortColumn} ${orderDirection}
+        LIMIT ? OFFSET ?
+      `;
+      const [rows] = await db.query(dataQuery, [userId, userId, searchStr, searchStr, searchStr, parsedLimit, offset]);
       items = rows;
     }
 
-    return res.json({ success: true, items });
+    return res.json({ 
+      success: true, 
+      items,
+      totalCount,
+      page: Number(page),
+      limit: parsedLimit
+    });
   } catch (error) {
     console.error('Error fetching vault items:', error);
     return res.status(500).json({ success: false, message: 'Failed to load vault items.' });

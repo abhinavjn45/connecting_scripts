@@ -30,9 +30,17 @@ function formatDate(dateStr) {
 
 export default function PasswordManagerPage() {
   const [items, setItems] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState("DESC");
+
   const [currentUserInfo, setCurrentUserInfo] = useState({ id: null, role: "" });
   
   // Modal state
@@ -75,12 +83,20 @@ export default function PasswordManagerPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/vault`, {
+      const params = new URLSearchParams({
+        page,
+        limit,
+        search: debouncedSearch,
+        sortBy,
+        sortOrder
+      });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/vault?${params.toString()}`, {
         credentials: "include",
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setItems(data.items);
+        setItems(data.items || []);
+        setTotalCount(data.totalCount || 0);
       } else {
         setError(data.message || "Failed to load vault items.");
       }
@@ -90,6 +106,14 @@ export default function PasswordManagerPage() {
       setLoading(false);
     }
   };
+
+  // Debounce search query
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   useEffect(() => {
     setCurrentUserInfo({
@@ -112,13 +136,22 @@ export default function PasswordManagerPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [page, limit, debouncedSearch, sortBy, sortOrder]);
 
-  // Filter items based on local search
-  const filteredItems = items.filter(item => 
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (item.username && item.username.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortBy(column);
+      setSortOrder("ASC");
+    }
+    setPage(1); // Reset to page 1 on sort change
+  };
+
+  const renderSortIndicator = (column) => {
+    if (sortBy !== column) return <span style={{ color: "var(--border-color)", marginLeft: "4px" }}>↕</span>;
+    return <span style={{ color: "var(--primary-color)", marginLeft: "4px" }}>{sortOrder === "ASC" ? "↑" : "↓"}</span>;
+  };
 
   const handleCreateNew = () => {
     setEditingItem(null);
@@ -444,7 +477,7 @@ export default function PasswordManagerPage() {
             <div style={{ width: "36px", height: "36px", border: "3px solid rgba(77,68,197,0.2)", borderTop: "3px solid var(--primary-color)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
             Loading credentials from database...
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : items.length === 0 ? (
           <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)", fontSize: "14px" }}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: "12px", color: "var(--border-color)" }}>
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -455,18 +488,18 @@ export default function PasswordManagerPage() {
         ) : (
           <div className="table-responsive">
             <table className="custom-table" style={{ minWidth: "1000px" }}>
-              <thead>
-                <tr>
-                  <th className="sticky-col-left" style={{ minWidth: "200px" }}>Title</th>
-                  <th style={{ minWidth: "220px" }}>URL</th>
-                  <th style={{ minWidth: "200px" }}>Username</th>
-                  <th style={{ minWidth: "150px" }}>Type</th>
-                  <th style={{ minWidth: "120px" }}>Created</th>
-                  <th className="sticky-col-right" style={{ textAlign: "right", minWidth: "150px" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map(item => (
+                <thead>
+                  <tr>
+                    <th className="sticky-col-left" style={{ minWidth: "200px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('title')}>Title {renderSortIndicator('title')}</th>
+                    <th style={{ minWidth: "220px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('url')}>URL {renderSortIndicator('url')}</th>
+                    <th style={{ minWidth: "200px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('username')}>Username {renderSortIndicator('username')}</th>
+                    <th style={{ minWidth: "150px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('auth_type')}>Type {renderSortIndicator('auth_type')}</th>
+                    <th style={{ minWidth: "120px", cursor: "pointer", userSelect: "none" }} onClick={() => handleSort('created_at')}>Created {renderSortIndicator('created_at')}</th>
+                    <th className="sticky-col-right" style={{ textAlign: "right", minWidth: "150px" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(item => (
                   <tr key={item.id}>
                     <td className="sticky-col-left">
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -604,6 +637,68 @@ export default function PasswordManagerPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {items.length > 0 && (
+          <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-color)", backgroundColor: "#fdfdfd" }}>
+            <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+              Showing <strong>{(page - 1) * limit + 1}</strong> to <strong>{Math.min(page * limit, totalCount)}</strong> of <strong>{totalCount}</strong> credentials
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--text-muted)" }}>
+                Rows per page:
+                <select 
+                  value={limit} 
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border-color)", outline: "none", cursor: "pointer", backgroundColor: "#fff" }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: "4px" }}>
+                <button 
+                  type="button" 
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                  style={{ 
+                    padding: "6px 12px", 
+                    backgroundColor: page === 1 ? "var(--border-color)" : "#fff",
+                    color: page === 1 ? "var(--text-muted)" : "var(--text-color)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "6px",
+                    cursor: page === 1 ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    transition: "var(--transition)"
+                  }}
+                >
+                  Previous
+                </button>
+                <button 
+                  type="button" 
+                  disabled={page * limit >= totalCount}
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ 
+                    padding: "6px 12px", 
+                    backgroundColor: page * limit >= totalCount ? "var(--border-color)" : "#fff",
+                    color: page * limit >= totalCount ? "var(--text-muted)" : "var(--text-color)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "6px",
+                    cursor: page * limit >= totalCount ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    transition: "var(--transition)"
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

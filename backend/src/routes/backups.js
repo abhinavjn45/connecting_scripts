@@ -114,43 +114,49 @@ router.delete('/schedules/:id', requirePermission('backups', 'delete'), async (r
   }
 });
 
-// GET /api/backups/history - Fetch history from Cloudinary
+// GET /api/backups/history - Fetch history from Database
 router.get('/history', requirePermission('backups', 'read'), async (req, res) => {
   try {
-    let allResources = [];
-    let hasMore = true;
-    let nextCursor = null;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 25;
+    const offset = (page - 1) * limit;
+    const { search, sortBy, sortOrder } = req.query;
 
-    while (hasMore) {
-      const searchOptions = {
-        type: 'upload',
-        resource_type: 'raw',
-        prefix: 'database_backups/',
-        max_results: 100
-      };
-      if (nextCursor) searchOptions.next_cursor = nextCursor;
-      
-      const result = await cloudinary.api.resources(searchOptions);
-      
-      allResources = allResources.concat(result.resources);
+    let whereClause = 'WHERE 1=1';
+    let queryParams = [];
 
-      if (result.next_cursor) {
-        nextCursor = result.next_cursor;
-      } else {
-        hasMore = false;
-      }
+    if (search) {
+      whereClause += ' AND public_id LIKE ?';
+      queryParams.push(`%${search}%`);
     }
 
-    // Format for frontend
-    const backups = allResources.map(res => ({
-      id: res.public_id,
-      name: res.public_id.split('/').pop(),
-      url: res.secure_url,
-      size: res.bytes,
-      created_at: res.created_at
-    })).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const [[{ totalCount }]] = await db.query(`SELECT COUNT(*) AS totalCount FROM backup_history ${whereClause}`, queryParams);
 
-    res.json({ success: true, backups });
+    const validSortColumns = {
+      'name': 'public_id',
+      'size': 'size',
+      'created_at': 'created_at'
+    };
+    const dbSortColumn = validSortColumns[sortBy] || 'created_at';
+    const dbSortOrder = sortOrder && sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const [rows] = await db.query(`
+      SELECT public_id AS id, 
+             SUBSTRING_INDEX(public_id, '/', -1) AS name, 
+             url, size, created_at
+      FROM backup_history
+      ${whereClause}
+      ORDER BY ${dbSortColumn} ${dbSortOrder}
+      LIMIT ? OFFSET ?
+    `, [...queryParams, limit, offset]);
+
+    res.json({ 
+      success: true, 
+      backups: rows,
+      totalCount,
+      page,
+      limit
+    });
   } catch (error) {
     console.error('Error fetching backup history:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -164,11 +170,18 @@ router.post('/history/bulk-delete', requirePermission('backups', 'delete'), asyn
     return res.status(400).json({ success: false, message: 'An array of backup IDs is required.' });
   }
 
+  // Validate IDs to prevent IDOR (only allow database_backups)
+  const invalidIds = ids.filter(id => typeof id !== 'string' || !id.startsWith('database_backups/'));
+  if (invalidIds.length > 0) {
+    return res.status(403).json({ success: false, message: 'Forbidden: Invalid backup IDs provided.' });
+  }
+
   try {
     // Cloudinary allows deleting up to 100 resources in a single call
     for (let i = 0; i < ids.length; i += 100) {
       const chunk = ids.slice(i, i + 100);
       await cloudinary.api.delete_resources(chunk, { resource_type: 'raw' });
+      await db.query('DELETE FROM backup_history WHERE public_id IN (?)', [chunk]);
     }
     
     await auditService.logAction(req.user.userId, 'backups', 'BULK_DELETE', JSON.stringify({ count: ids.length, ids }), req);

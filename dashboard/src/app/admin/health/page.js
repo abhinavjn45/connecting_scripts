@@ -303,47 +303,7 @@ export default function SiteHealthPage() {
 
           </div>
 
-          {/* AUDIT LOGS TERMINAL */}
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-             <div style={{ padding: "16px 24px", backgroundColor: "#1e1e1e", display: "flex", alignItems: "center", gap: "12px" }}>
-               <div style={{ display: "flex", gap: "6px" }}>
-                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#ff5f56" }}></div>
-                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#ffbd2e" }}></div>
-                 <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#27c93f" }}></div>
-               </div>
-               <h3 style={{ fontSize: "14px", fontWeight: "600", margin: 0, color: "#fff", letterSpacing: "1px" }}>SYSTEM_AUDIT_LOGS</h3>
-             </div>
-             
-             <div style={{ backgroundColor: "#0d0d0d", padding: "20px 24px", minHeight: "300px", maxHeight: "400px", overflowY: "auto", fontFamily: "monospace", color: "#a5d6ff", fontSize: "13px" }}>
-               {metrics.recentAuditLogs && metrics.recentAuditLogs.length > 0 ? (
-                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                   <tbody>
-                     {metrics.recentAuditLogs.map(log => (
-                       <tr key={log.id} style={{ borderBottom: "1px solid #333", backgroundColor: log.action === 'SYSTEM_CRASH' ? 'rgba(255, 95, 86, 0.1)' : 'transparent' }}>
-                         <td style={{ padding: "10px 0", width: "160px", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#8b949e", paddingLeft: log.action === 'SYSTEM_CRASH' ? "8px" : "0" }}>
-                           [{new Date(log.created_at).toLocaleString()}]
-                         </td>
-                         <td style={{ padding: "10px 16px", width: "180px", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#79c0ff", fontWeight: log.action === 'SYSTEM_CRASH' ? "bold" : "normal" }}>
-                           {log.action}
-                         </td>
-                         <td style={{ padding: "10px 16px", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#d2a8ff" }}>
-                           {log.first_name ? `${log.first_name} ${log.last_name} (@${log.username})` : 'System Daemon'}
-                         </td>
-                         <td style={{ padding: "10px 0", color: log.action === 'SYSTEM_CRASH' ? "#ffbd2e" : "#c9d1d9" }}>
-                           {log.details ? log.details : "N/A"}
-                         </td>
-                         <td style={{ padding: "10px 16px", textAlign: "right", color: log.action === 'SYSTEM_CRASH' ? "#ff5f56" : "#8b949e" }}>
-                           IP: {log.ip_address || "Unknown"}
-                         </td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               ) : (
-                 <div style={{ color: "#8b949e" }}>&gt; No recent audit logs found in the database.</div>
-               )}
-             </div>
-          </div>
+
         </>
       )}
 

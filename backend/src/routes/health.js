@@ -20,15 +20,6 @@ router.get('/metrics', requirePermission('site_health', 'read'), async (req, res
       healthService.getSecurityTracker()
     ]);
     
-    // Also fetch the last 10 audit logs for the mini-terminal
-    const [auditLogs] = await db.query(`
-      SELECT s.*, u.first_name, u.last_name, u.username
-      FROM system_audit_logs s
-      LEFT JOIN users u ON s.user_id = u.id
-      ORDER BY s.created_at DESC
-      LIMIT 10
-    `);
-
     res.json({
       success: true,
       data: {
@@ -41,8 +32,7 @@ router.get('/metrics', requirePermission('site_health', 'read'), async (req, res
           email: emailStatus,
           watchdog,
           security
-        },
-        recentAuditLogs: auditLogs
+        }
       }
     });
   } catch (error) {

@@ -23,10 +23,21 @@ const PORT = process.env.PORT || 5000;
 // Trust Proxy for Render/Heroku load balancers (fixes express-rate-limit X-Forwarded-For warning)
 app.set('trust proxy', 1);
 
+const allowedOrigins = [
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000']),
+  ...(process.env.PUBLIC_FRONTEND_URL ? process.env.PUBLIC_FRONTEND_URL.split(',') : [])
+].map(url => url.trim());
+
 // Security Middlewares
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
@@ -35,9 +46,10 @@ app.use(cors({
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
     const origin = req.headers.origin || req.headers.referer;
-    const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
     
-    if (origin && !origin.startsWith(allowedOrigin)) {
+    const isAllowed = allowedOrigins.some(allowed => origin && origin.startsWith(allowed));
+    
+    if (origin && !isAllowed) {
       console.warn(`[SECURITY] Blocked CSRF attempt from origin: ${origin}`);
       return res.status(403).json({ success: false, message: 'CSRF validation failed: Invalid Origin.' });
     }
