@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validator');
 const db = require('../config/db');
 const { send2FAEmail, sendForgotPasswordEmail } = require('../services/emailService');
 
@@ -61,12 +63,11 @@ async function getUserPermissions(userId) {
 }
 
 // 1. POST /api/auth/login
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, [
+  body('email').trim().isEmail().normalizeEmail().withMessage('Please provide a valid email address.'),
+  body('password').trim().notEmpty().withMessage('Password is required.')
+], validate, async (req, res) => {
   const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'Please fill in all fields.' });
-  }
 
   try {
     // Retrieve user details from database
@@ -172,12 +173,11 @@ router.post('/login', loginLimiter, async (req, res) => {
 });
 
 // 2. POST /api/auth/verify-2fa
-router.post('/verify-2fa', otpLimiter, async (req, res) => {
+router.post('/verify-2fa', otpLimiter, [
+  body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required.'),
+  body('otp_code').trim().isLength({ min: 6, max: 6 }).isNumeric().withMessage('Verification code must be 6 digits.')
+], validate, async (req, res) => {
   const { email, otp_code } = req.body;
-
-  if (!email || !otp_code) {
-    return res.status(400).json({ success: false, message: 'Please provide both email and verification code.' });
-  }
 
   try {
     const [users] = await db.query('SELECT * FROM users WHERE company_email = ?', [email]);
@@ -248,11 +248,10 @@ router.post('/verify-2fa', otpLimiter, async (req, res) => {
 });
 
 // 2.5 POST /api/auth/resend-2fa
-router.post('/resend-2fa', otpLimiter, async (req, res) => {
+router.post('/resend-2fa', otpLimiter, [
+  body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required.')
+], validate, async (req, res) => {
   const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ success: false, message: 'Email is required.' });
-  }
 
   try {
     const [users] = await db.query('SELECT * FROM users WHERE company_email = ?', [email]);
@@ -298,11 +297,10 @@ router.get('/logout', (req, res) => {
 // ==========================================
 
 // 1. POST /api/auth/forgot-password/request
-router.post('/forgot-password/request', forgotPasswordLimiter, async (req, res) => {
+router.post('/forgot-password/request', forgotPasswordLimiter, [
+  body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required.')
+], validate, async (req, res) => {
   const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ success: false, message: 'Email is required.' });
-  }
 
   try {
     const [users] = await db.query(
@@ -344,12 +342,11 @@ router.post('/forgot-password/request', forgotPasswordLimiter, async (req, res) 
 });
 
 // 2. POST /api/auth/forgot-password/verify
-router.post('/forgot-password/verify', otpLimiter, async (req, res) => {
+router.post('/forgot-password/verify', otpLimiter, [
+  body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required.'),
+  body('otp').trim().isLength({ min: 6, max: 6 }).isNumeric().withMessage('Verification code must be 6 digits.')
+], validate, async (req, res) => {
   const { email, otp } = req.body;
-  
-  if (!email || !otp) {
-    return res.status(400).json({ success: false, message: 'Email and OTP are required.' });
-  }
 
   try {
     const [users] = await db.query(
@@ -386,16 +383,15 @@ router.post('/forgot-password/verify', otpLimiter, async (req, res) => {
 });
 
 // 3. POST /api/auth/forgot-password/reset
-router.post('/forgot-password/reset', otpLimiter, async (req, res) => {
+router.post('/forgot-password/reset', otpLimiter, [
+  body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required.'),
+  body('otp').trim().isLength({ min: 6, max: 6 }).isNumeric().withMessage('Verification code must be 6 digits.'),
+  body('newPassword')
+    .trim()
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/)
+    .withMessage('Password must be at least 8 characters long and contain an uppercase letter, lowercase letter, number, and special character.')
+], validate, async (req, res) => {
   const { email, otp, newPassword } = req.body;
-
-  if (!email || !otp || !newPassword) {
-    return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required.' });
-  }
-
-  if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
-    return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long and contain an uppercase letter, lowercase letter, number, and special character.' });
-  }
 
   try {
     const [users] = await db.query(

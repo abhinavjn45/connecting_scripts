@@ -29,7 +29,7 @@ router.post('/upload', verifyToken, upload.single('file'), (req, res) => {
   const uploadStream = cloudinary.uploader.upload_stream(
     { 
       folder: 'connecting_scripts',
-      resource_type: 'auto' // handles images, video, pdfs automatically
+      resource_type: 'image' // Force image type to handle SVGs correctly
     },
     (error, result) => {
       if (error) {
@@ -69,7 +69,7 @@ router.post('/upload-avatar', verifyToken, upload.single('file'), (req, res) => 
       folder: 'user_avatars',
       public_id: `user_${req.user.userId}`,
       overwrite: true,
-      resource_type: 'auto'
+      resource_type: 'image' // Force image type to handle SVGs correctly
     },
     (error, result) => {
       if (error) {

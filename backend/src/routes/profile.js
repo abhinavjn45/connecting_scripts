@@ -6,6 +6,8 @@ const cloudinary = require('../config/cloudinary');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validator');
 
 // --- Rate Limiters ---
 const tfaRequestLimiter = rateLimit({
@@ -115,13 +117,11 @@ function getPublicIdFromUrl(url) {
 }
 
 // 1b. PUT /api/profile/avatar (Authenticated)
-router.put('/avatar', verifyToken, async (req, res) => {
+router.put('/avatar', verifyToken, [
+  body('avatarUrl').trim().isURL({ require_protocol: true }).withMessage('Valid avatar image URL is required.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const { avatarUrl } = req.body;
-
-  if (!avatarUrl) {
-    return res.status(400).json({ success: false, message: 'Avatar image URL is required.' });
-  }
 
   // Security: Strictly validate that the incoming URL is from our own Cloudinary account
   // and belongs to the user_avatars folder to prevent IDOR via URL manipulation.
@@ -146,22 +146,17 @@ router.put('/avatar', verifyToken, async (req, res) => {
 });
 
 // 1c. PUT /api/profile/change-password (Authenticated)
-router.put('/change-password', verifyToken, passwordChangeLimiter, async (req, res) => {
+router.put('/change-password', verifyToken, passwordChangeLimiter, [
+  body('currentPassword').trim().notEmpty().withMessage('Current password is required.'),
+  body('newPassword')
+    .trim()
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/)
+    .withMessage('New password must be at least 8 characters long and contain a mix of uppercase, lowercase, numbers, and special characters.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const { currentPassword, newPassword } = req.body;
 
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ success: false, message: 'Current password and new password are required.' });
-  }
 
-  // Strong password complexity validation: at least 8 chars, uppercase, lowercase, number, and special character
-  const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-  if (!strongPasswordRegex.test(newPassword)) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'New password must be at least 8 characters long and contain a mix of uppercase, lowercase, numbers, and special characters.' 
-    });
-  }
 
   try {
     // 1. Fetch user password hash
@@ -195,21 +190,15 @@ router.put('/change-password', verifyToken, passwordChangeLimiter, async (req, r
 });
 
 // 2. PUT /api/profile
-router.put('/', verifyToken, async (req, res) => {
+router.put('/', verifyToken, [
+  body('firstName').trim().isLength({ min: 1, max: 50 }).withMessage('First name is required and cannot exceed 50 characters.').escape(),
+  body('lastName').trim().isLength({ min: 1, max: 50 }).withMessage('Last name is required and cannot exceed 50 characters.').escape(),
+  body('personalEmail').optional({ checkFalsy: true }).trim().isEmail().normalizeEmail().withMessage('Valid personal email is required.'),
+  body('phoneNumber').optional({ checkFalsy: true }).trim().escape(),
+  body('bio').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bio cannot exceed 100 characters.').escape()
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const { firstName, lastName, phoneNumber, bio, personalEmail } = req.body;
-
-  if (!firstName || !lastName) {
-    return res.status(400).json({ success: false, message: 'First name and last name are required.' });
-  }
-
-  if (firstName.length > 50 || lastName.length > 50) {
-    return res.status(400).json({ success: false, message: 'Name fields cannot exceed 50 characters.' });
-  }
-
-  if (bio && bio.length > 100) {
-    return res.status(400).json({ success: false, message: 'Bio cannot exceed 100 characters.' });
-  }
 
   try {
     await db.query(`
@@ -273,13 +262,11 @@ router.post('/2fa/request', verifyToken, tfaRequestLimiter, async (req, res) => 
 });
 
 // 3b. POST /api/profile/2fa/verify
-router.post('/2fa/verify', verifyToken, async (req, res) => {
+router.post('/2fa/verify', verifyToken, [
+  body('otpCode').trim().isLength({ min: 6, max: 6 }).isNumeric().withMessage('Please provide a valid 6-digit OTP.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const { otpCode } = req.body;
-
-  if (!otpCode || otpCode.length !== 6) {
-    return res.status(400).json({ success: false, message: 'Please provide a valid 6-digit OTP.' });
-  }
 
   try {
     const [users] = await db.query('SELECT otp_code, otp_expires_at FROM users WHERE id = ?', [userId]);
@@ -343,13 +330,11 @@ router.post('/2fa/disable/request', verifyToken, tfaRequestLimiter, async (req, 
 });
 
 // 3d. POST /api/profile/2fa/disable/verify — Verify OTP and disable 2FA
-router.post('/2fa/disable/verify', verifyToken, async (req, res) => {
+router.post('/2fa/disable/verify', verifyToken, [
+  body('otpCode').trim().isLength({ min: 6, max: 6 }).isNumeric().withMessage('Please provide a valid 6-digit code.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const { otpCode } = req.body;
-
-  if (!otpCode || otpCode.length !== 6) {
-    return res.status(400).json({ success: false, message: 'Please provide a valid 6-digit code.' });
-  }
 
   try {
     const [users] = await db.query('SELECT otp_code, otp_expires_at, two_factor_enabled FROM users WHERE id = ?', [userId]);
@@ -386,7 +371,10 @@ router.post('/2fa/disable/verify', verifyToken, async (req, res) => {
 });
 
 // 4. PUT /api/profile/rbac
-router.put('/rbac', verifyToken, async (req, res) => {
+router.put('/rbac', verifyToken, [
+  body('role').trim().notEmpty().withMessage('Role is required.'),
+  body('permissions').isObject().withMessage('Permissions object is required.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const callerRole = req.user.role;
   const { role, permissions } = req.body;
@@ -397,10 +385,6 @@ router.put('/rbac', verifyToken, async (req, res) => {
 
   if (role === 'Super Admin' && callerRole !== 'Super Admin') {
     return res.status(403).json({ success: false, message: 'Only Super Admins can assign the Super Admin role.' });
-  }
-
-  if (!role || !permissions) {
-    return res.status(400).json({ success: false, message: 'Role and permissions object are required.' });
   }
 
   const connection = await db.getConnection();

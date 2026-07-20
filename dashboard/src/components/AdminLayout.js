@@ -26,6 +26,8 @@ export default function AdminLayout({ children, title }) {
     role: "Super Admin"
   });
 
+  const [settings, setSettings] = useState({});
+
   // RBAC permissions state representing the CRUD matrix
   const [permissions, setPermissions] = useState(() => {
     const defaultPerms = {};
@@ -54,9 +56,10 @@ export default function AdminLayout({ children, title }) {
 
       // Step 2: Verify token with backend — this is the real security gate
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
-          credentials: "include"
-        });
+        const [res, settingsRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/settings`, { credentials: "include" }).catch(() => null)
+        ]);
 
         if (res.status === 401 || res.status === 403) {
           // Token invalid, expired, or revoked — force logout
@@ -79,6 +82,13 @@ export default function AdminLayout({ children, title }) {
         if (data.success) {
           setUser(data.user);
           setPermissions(data.permissions || {});
+
+          if (settingsRes && settingsRes.ok) {
+            const sData = await settingsRes.json();
+            if (sData.success) {
+              setSettings(sData.settings || {});
+            }
+          }
 
           // Keep local cache in sync
           localStorage.setItem("cs_user_id", data.user.id);
@@ -191,7 +201,7 @@ export default function AdminLayout({ children, title }) {
 
   return (
     <div className={`admin-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-      <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} permissions={permissions} />
+      <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} permissions={permissions} settings={settings} collapsed={sidebarCollapsed} theme={theme} />
       <div className="main-wrapper">
         <header className="top-bar">
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>

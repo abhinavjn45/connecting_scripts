@@ -2,6 +2,8 @@ const router = require('express').Router();
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validator');
 const verifyToken = require('../middleware/auth');
 const { requirePermission } = require('../middleware/rbac');
 
@@ -121,15 +123,26 @@ router.get('/:id', verifyToken, requirePermission('users', 'read'), async (req, 
 });
 
 // POST /api/users - Create new user
-router.post('/', verifyToken, requirePermission('users', 'create'), async (req, res) => {
+router.post('/', verifyToken, requirePermission('users', 'create'), [
+  body('firstName').trim().notEmpty().withMessage('First name is required.').escape(),
+  body('lastName').trim().notEmpty().withMessage('Last name is required.').escape(),
+  body('username').trim().notEmpty().withMessage('Username is required.').escape(),
+  body('companyEmail').trim().isEmail().normalizeEmail().withMessage('Valid company email is required.'),
+  body('personalEmail').optional({ checkFalsy: true }).trim().isEmail().normalizeEmail().withMessage('Valid personal email is required.'),
+  body('phoneNumber').optional({ checkFalsy: true }).trim().escape(),
+  body('role').isIn(['Super Admin', 'Admin', 'Editor', 'Viewer']).withMessage('Invalid role.'),
+  body('status').isIn(['Active', 'Inactive', 'Suspended', 'Pending']).withMessage('Invalid status.'),
+  body('password')
+    .trim()
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/)
+    .withMessage('Password must be at least 8 characters long and contain an uppercase letter, lowercase letter, number, and special character.'),
+  body('bio').optional({ checkFalsy: true }).trim().escape(),
+  body('designation').optional({ checkFalsy: true }).trim().escape()
+], validate, async (req, res) => {
   const {
     firstName, lastName, username, companyEmail, personalEmail,
     phoneNumber, bio, gender, designation, role, status, joiningDate, password, permissions
   } = req.body;
-
-  if (!firstName || !lastName || !username || !companyEmail || !password) {
-    return res.status(400).json({ success: false, message: 'First name, last name, username, company email, and password are required.' });
-  }
 
   // Prevent Privilege Escalation
   if (role === 'Super Admin' && req.user.role !== 'Super Admin') {
@@ -210,16 +223,23 @@ router.post('/', verifyToken, requirePermission('users', 'create'), async (req, 
 });
 
 // PUT /api/users/:id - Update user
-router.put('/:id', verifyToken, requirePermission('users', 'update'), async (req, res) => {
+router.put('/:id', verifyToken, requirePermission('users', 'update'), [
+  body('firstName').trim().notEmpty().withMessage('First name is required.').escape(),
+  body('lastName').trim().notEmpty().withMessage('Last name is required.').escape(),
+  body('username').trim().notEmpty().withMessage('Username is required.').escape(),
+  body('companyEmail').trim().isEmail().normalizeEmail().withMessage('Valid company email is required.'),
+  body('personalEmail').optional({ checkFalsy: true }).trim().isEmail().normalizeEmail().withMessage('Valid personal email is required.'),
+  body('phoneNumber').optional({ checkFalsy: true }).trim().escape(),
+  body('role').isIn(['Super Admin', 'Admin', 'Editor', 'Viewer']).withMessage('Invalid role.'),
+  body('status').isIn(['Active', 'Inactive', 'Suspended', 'Pending']).withMessage('Invalid status.'),
+  body('bio').optional({ checkFalsy: true }).trim().escape(),
+  body('designation').optional({ checkFalsy: true }).trim().escape()
+], validate, async (req, res) => {
   const { id } = req.params;
   const {
     firstName, lastName, username, companyEmail, personalEmail,
     phoneNumber, bio, gender, designation, role, status, joiningDate, permissions
   } = req.body;
-
-  if (!firstName || !lastName || !companyEmail) {
-    return res.status(400).json({ success: false, message: 'First name, last name, and company email are required.' });
-  }
 
   try {
     // Check uniqueness (exclude self)

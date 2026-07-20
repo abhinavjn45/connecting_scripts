@@ -3,6 +3,8 @@ const router = require('express').Router();
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validator');
 const db = require('../config/db');
 const verifyToken = require('../middleware/auth');
 const { send2FAEmail } = require('../services/emailService');
@@ -256,13 +258,18 @@ router.get('/', verifyToken, async (req, res) => {
 // ---------------------------------------------------------
 // Route: POST /api/vault (Create item)
 // ---------------------------------------------------------
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, [
+  body('title').trim().notEmpty().withMessage('Title is required.').escape(),
+  body('url').optional({ checkFalsy: true }).trim().isURL({ require_protocol: true }).withMessage('Must be a valid URL with http/https.'),
+  body('username').optional({ checkFalsy: true }).trim().escape(),
+  body('authType').isIn(['password', 'oauth']).withMessage('Invalid authentication type.'),
+  body('oauthProvider').optional({ checkFalsy: true }).trim().escape(),
+  body('notes').optional({ checkFalsy: true }).trim().escape(),
+  body('assignedUsers').optional().isArray().withMessage('Assigned users must be an array.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const userRole = req.user.role;
   const { title, url, username, authType, oauthProvider, password, notes, assignedUsers } = req.body;
-
-  if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
-  if (authType !== 'password' && authType !== 'oauth') return res.status(400).json({ success: false, message: 'Invalid authentication type.' });
 
   try {
     const hasCreate = await checkModulePermission(userId, 'create');
@@ -343,7 +350,11 @@ router.post('/request-otp', verifyToken, vaultOtpLimiter, async (req, res) => {
 // ---------------------------------------------------------
 // Route: POST /api/vault/:id/reveal (Decrypt Password with Auth)
 // ---------------------------------------------------------
-router.post('/:id/reveal', verifyToken, vaultRevealLimiter, async (req, res) => {
+router.post('/:id/reveal', verifyToken, vaultRevealLimiter, [
+  body('action').trim().isIn(['viewed_password', 'copied_password']).withMessage('Invalid action.'),
+  body('authMethod').trim().isIn(['otp']).withMessage('Invalid auth method.'),
+  body('authValue').trim().isLength({ min: 6, max: 6 }).isNumeric().withMessage('Verification code must be 6 digits.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const userRole = req.user.role;
   const itemId = req.params.id;
@@ -487,14 +498,19 @@ router.get('/:id/access', verifyToken, async (req, res) => {
 // ---------------------------------------------------------
 // Route: PUT /api/vault/:id (Update item)
 // ---------------------------------------------------------
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, [
+  body('title').trim().notEmpty().withMessage('Title is required.').escape(),
+  body('url').optional({ checkFalsy: true }).trim().isURL({ require_protocol: true }).withMessage('Must be a valid URL with http/https.'),
+  body('username').optional({ checkFalsy: true }).trim().escape(),
+  body('authType').isIn(['password', 'oauth']).withMessage('Invalid authentication type.'),
+  body('oauthProvider').optional({ checkFalsy: true }).trim().escape(),
+  body('notes').optional({ checkFalsy: true }).trim().escape(),
+  body('assignedUsers').optional().isArray().withMessage('Assigned users must be an array.')
+], validate, async (req, res) => {
   const userId = req.user.userId;
   const userRole = req.user.role;
   const itemId = req.params.id;
   const { title, url, username, authType, oauthProvider, password, notes, assignedUsers } = req.body;
-
-  if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
-  if (authType !== 'password' && authType !== 'oauth') return res.status(400).json({ success: false, message: 'Invalid authentication type.' });
 
   try {
     const hasUpdate = await checkModulePermission(userId, 'update');

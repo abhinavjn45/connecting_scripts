@@ -2,6 +2,8 @@ const router = require('express').Router();
 const db = require('../config/db');
 const verifyToken = require('../middleware/auth');
 const { requirePermission } = require('../middleware/rbac');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validator');
 const backupService = require('../services/backupService');
 const auditService = require('../services/auditService');
 const cloudinary = require('cloudinary').v2;
@@ -38,11 +40,10 @@ router.get('/schedules', requirePermission('backups', 'create'), async (req, res
 });
 
 // POST /api/backups/schedules - Add a new schedule
-router.post('/schedules', requirePermission('backups', 'create'), async (req, res) => {
+router.post('/schedules', requirePermission('backups', 'create'), [
+  body('schedule_time').trim().matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage('Invalid time format. Use HH:mm')
+], validate, async (req, res) => {
   const { schedule_time } = req.body;
-  if (!schedule_time || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(schedule_time)) {
-    return res.status(400).json({ success: false, message: 'Invalid time format. Use HH:mm' });
-  }
 
   try {
     const [existing] = await db.query('SELECT id FROM backup_schedules WHERE schedule_time = ?', [schedule_time]);
@@ -67,7 +68,9 @@ router.post('/schedules', requirePermission('backups', 'create'), async (req, re
 });
 
 // PUT /api/backups/schedules/:id - Update a schedule (e.g., toggle active)
-router.put('/schedules/:id', requirePermission('backups', 'update'), async (req, res) => {
+router.put('/schedules/:id', requirePermission('backups', 'update'), [
+  body('is_active').isBoolean().withMessage('is_active must be a boolean.')
+], validate, async (req, res) => {
   const scheduleId = req.params.id;
   const { is_active } = req.body;
 
